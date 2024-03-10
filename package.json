@@ -1,0 +1,27 @@
+{
+  "name": "prisma-eventify",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "type-check": "tsc",
+    "build": "swc src --out-dir dist --extensions '.ts'",
+    "test": "jest tests",
+    "lint": "eslint --ext .ts \"src/**/*.ts\"",
+    "lint:fix": "npm run lint -- --fix"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:LorenzoRottigni/prisma-EDD.git",
+  "author": "LorenzoRottigni <lorenzo@rottigni.net>",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.10.2",
+    "@prisma/generator-helper": "^5.10.2",
+    "@prisma/internals": "^5.10.2",
+    "prisma": "^5.10.2",
+    "typescript": "^5.4.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0"
+  }
+}
