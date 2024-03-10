@@ -4,13 +4,23 @@ import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
 import { EventifyConfig } from '../types/config'
+import { EventifySourceFile } from '../types'
+import { ConfigService } from '../services/config.service'
 
-export default class ServiceGenerator extends PrismaService {
-  private sourceFiles: ts.SourceFile[] = []
-  constructor(document: DMMF.Document, private config: EventifyConfig) {
-    super(document)
-    this.schema.datamodel.models.forEach((model) => {
-      this.sourceFiles.push(createSourceFile(`${model.name.toLowerCase()}.resolver.ts`))
+export default class ServiceGenerator {
+  private sourceFiles: EventifySourceFile[] = []
+  constructor(
+    schema: DMMF.Document,
+    config: EventifyConfig,
+    private prismaService = new PrismaService(schema),
+    private configService = new ConfigService(config)
+  ) {
+    prismaService.models.forEach((model) => {
+      const sourceFile = createSourceFile(`${model.name.toLowerCase()}.resolver.ts`)
+      this.sourceFiles.push({
+        ...sourceFile,
+        model: model.name.toLowerCase(),
+      })
     })
   }
 
@@ -19,12 +29,13 @@ export default class ServiceGenerator extends PrismaService {
     let status: boolean[] = []
     this.sourceFiles.forEach((sourceFile) => {
       try {
-        const filename = `${this.config.outDir}/${sourceFile.fileName}`
+        const filename = this.configService.buildPath(sourceFile.fileName)
         const file = printer.printNode(
           ts.EmitHint.SourceFile,
           ts.factory.updateSourceFile(sourceFile, [
-            ...this.__imports,
-            this.__modelServiceClass(sourceFile.fileName.split('.')[0]),
+            this.__prismaClientImport,
+            this.__prismaClientModelsImport([sourceFile.model]),
+            this.__modelServiceClass(sourceFile.model),
           ]),
           sourceFile
         )
@@ -39,38 +50,48 @@ export default class ServiceGenerator extends PrismaService {
   }
 
   public __modelServiceClass(modelName: string): ts.ClassDeclaration {
-    const model = this.getModel(modelName)
+    const model = this.prismaService.getModel(modelName)
 
     return ts.factory.createClassDeclaration(
       [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
       `${capitalize(modelName)}Service`,
       [],
       [],
-      [
-        ts.factory.createConstructorDeclaration(undefined, [], ts.factory.createBlock([], true)),
-        this.__findAllMethod(model?.name || modelName),
-        this.__findOneMethod(model?.name || modelName),
-        this.__createMethod(model?.name || modelName),
-        this.__updateMethod(model?.name || modelName),
-        this.__deleteMethod(model?.name || modelName),
-        ...(model ? model.fields.map((field) => this.__getterMethod(model.name, field)) : []),
-        ...(model ? model.fields.map((field) => this.__setterMethod(model.name, field)) : []),
-      ]
+      model
+        ? [
+            ts.factory.createConstructorDeclaration(undefined, [], ts.factory.createBlock([], true)),
+            this.__findAllMethod(model.name),
+            this.__findOneMethod(model.name),
+            this.__createMethod(model.name),
+            this.__updateMethod(model.name),
+            this.__deleteMethod(model.name),
+            ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name) ? this.__getterMethod(model.name, field) : []
+              ),
+            ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name) ? this.__setterMethod(model.name, field) : []
+              ),
+          ].flat(2)
+        : []
     )
   }
 
-  public get __imports(): ts.ImportDeclaration[] {
-    return [this.__prismaClientImport, this.__prismaClientModelsImport()]
-  }
-
-  public __prismaClientModelsImport(models: string[] = this.models.map((m) => m.name)): ts.ImportDeclaration {
+  public __prismaClientModelsImport(
+    models: string[] = this.prismaService.models.map((m) => m.name)
+  ): ts.ImportDeclaration {
     return ts.factory.createImportDeclaration(
       undefined,
       ts.factory.createImportClause(
         true,
         undefined,
         ts.factory.createNamedImports(
-          models.map((model) => ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(model)))
+          models.map((model) =>
+            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(capitalize(model)))
+          )
         )
       ),
       ts.factory.createStringLiteral('@prisma/client')
@@ -310,7 +331,10 @@ export default class ServiceGenerator extends PrismaService {
   public __getterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
     const methodName = `get${capitalize(field.name)}`
     const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createUnionTypeNode([this.prismaToTSType(field.type), ts.factory.createTypeReferenceNode('null')]),
+      ts.factory.createUnionTypeNode([
+        this.prismaService.prismaToTSType(field.type),
+        ts.factory.createTypeReferenceNode('null'),
+      ]),
     ])
 
     const body: ts.Block = ts.factory.createBlock(
@@ -368,7 +392,7 @@ export default class ServiceGenerator extends PrismaService {
       undefined,
       ts.factory.createIdentifier(modelName.toLowerCase()),
       undefined,
-      this.prismaToTSType(field.type)
+      this.prismaService.prismaToTSType(field.type)
     )
 
     return ts.factory.createMethodDeclaration(

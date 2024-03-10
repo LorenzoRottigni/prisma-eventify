@@ -2,9 +2,9 @@ import { DMMF } from '@prisma/generator-helper'
 import ts from 'typescript'
 
 export class PrismaService {
-  constructor(protected schema: DMMF.Document) {}
+  constructor(public schema: DMMF.Document) {}
 
-  protected get models(): Readonly<DMMF.Model[]> {
+  public get models(): Readonly<DMMF.Model[]> {
     return this.schema.datamodel.models
   }
 
