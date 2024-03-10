@@ -1,20 +1,13 @@
-import { DMMF } from '@prisma/generator-helper'
 import { PrismaService } from '../services/prisma.service'
 import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
-import { EventifyConfig } from '../types/config'
 import { EventifySourceFile } from '../types'
 import { ConfigService } from '../services/config.service'
 
 export default class ServiceGenerator {
   private sourceFiles: EventifySourceFile[] = []
-  constructor(
-    schema: DMMF.Document,
-    config: EventifyConfig,
-    private prismaService = new PrismaService(schema),
-    private configService = new ConfigService(config)
-  ) {
+  constructor(private prismaService: PrismaService, private configService: ConfigService) {
     this.loadSourceFiles()
   }
 

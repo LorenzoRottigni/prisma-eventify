@@ -18,6 +18,7 @@
     "@prisma/generator-helper": "^5.10.2",
     "@prisma/internals": "^5.10.2",
     "prisma": "^5.10.2",
+    "ts-bus": "^2.3.1",
     "typescript": "^5.4.2"
   },
   "devDependencies": {
