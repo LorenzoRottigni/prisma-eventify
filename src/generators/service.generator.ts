@@ -15,7 +15,15 @@ export default class ServiceGenerator {
     private prismaService = new PrismaService(schema),
     private configService = new ConfigService(config)
   ) {
-    prismaService.models.forEach((model) => {
+    this.loadSourceFiles()
+  }
+
+  /**
+   * @description For each model defined in the schema generates its source file (<model>.service.ts).
+   */
+  private loadSourceFiles() {
+    this.prismaService.models.forEach((model) => {
+      if (!this.configService.modelAllowed(model.name)) return
       const sourceFile = createSourceFile(`${model.name.toLowerCase()}.service.ts`)
       this.sourceFiles.push({
         ...sourceFile,
@@ -24,6 +32,10 @@ export default class ServiceGenerator {
     })
   }
 
+  /**
+   * @description For each source file loaded in the class generates its service class <model>.service.ts
+   * @returns {boolean} Generation status.
+   */
   public generateBundle(): boolean {
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
     let status: boolean[] = []
@@ -49,129 +61,13 @@ export default class ServiceGenerator {
     return !status.includes(false)
   }
 
-  public __modelServiceClass(modelName: string): ts.ClassDeclaration {
-    const model = this.prismaService.getModel(modelName)
-
-    return ts.factory.createClassDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-      `${capitalize(modelName)}Service`,
-      [],
-      [],
-      model
-        ? [
-            this.__constructor,
-            ...['findMany', 'findUnique', 'create', 'update', 'delete'].map((method) =>
-              this.generateModelMethod(model.name, method)
-            ),
-            ...model.fields
-              .filter((m) => this.configService.modelAllowed(m.name))
-              .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name) ? this.__getterMethod(model.name, field) : []
-              ),
-            ...model.fields
-              .filter((m) => this.configService.modelAllowed(m.name))
-              .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name) ? this.__setterMethod(model.name, field) : []
-              ),
-          ].flat(2)
-        : []
-    )
-  }
-
-  public get __constructor() {
-    return ts.factory.createConstructorDeclaration(
-      undefined,
-      [
-        ts.factory.createParameterDeclaration(
-          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)], // Modifier: private
-          undefined,
-          ts.factory.createIdentifier('prisma'), // Parameter name
-          undefined, // Type annotation (optional)
-          undefined,
-          ts.factory.createNewExpression(
-            ts.factory.createIdentifier('PrismaClient'), // Class name for construction
-            undefined, // Type arguments (optional)
-            [] // Empty arguments array
-          )
-        ),
-      ],
-      ts.factory.createBlock(
-        [
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('prisma'),
-                ts.factory.createIdentifier('$connect')
-              ),
-              undefined,
-              []
-            )
-          ),
-        ],
-        true
-      )
-    )
-  }
-
-  public __prismaClientModelsImport(
-    models: string[] = this.prismaService.models.map((m) => m.name)
-  ): ts.ImportDeclaration {
-    return ts.factory.createImportDeclaration(
-      undefined,
-      ts.factory.createImportClause(
-        true,
-        undefined,
-        ts.factory.createNamedImports(
-          models.map((model) =>
-            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(capitalize(model)))
-          )
-        )
-      ),
-      ts.factory.createStringLiteral('@prisma/client')
-    )
-  }
-
   /**
-   * @description Generates Prisma client import declaration:
-   * import { PrismaClient } from '@prisma/client'
-   * @returns {ts.ImportDeclaration}
+   * @description Given a model and a prisma ORM method name generates the model service method.
+   * @param {string} modelName Service class.
+   * @param {string} methodName Service method.
+   * @returns {ts.MethodDeclaration}
    */
-  public get __prismaClientImport(): ts.ImportDeclaration {
-    const module = '@prisma/client'
-    const namedImport = 'PrismaClient'
-    return ts.factory.createImportDeclaration(
-      /* modifiers */ undefined,
-      ts.factory.createImportClause(
-        /* isTypeOnly */ false,
-        /* name (default import) */ undefined,
-        ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(namedImport)),
-        ])
-      ),
-      ts.factory.createStringLiteral(module)
-    )
-  }
-
-  /**
-   * @description Generates PrismaClient object declaration:
-   * const prisma = new PrismaClient()
-   * @returns {ts.VariableStatement}
-   */
-  public get __prismaClientStatement(): ts.VariableStatement {
-    return ts.factory.createVariableStatement(
-      undefined,
-      ts.factory.createVariableDeclarationList([
-        ts.factory.createVariableDeclaration(
-          ts.factory.createIdentifier('prisma'),
-          undefined,
-          undefined,
-          ts.factory.createNewExpression(ts.factory.createIdentifier('PrismaClient'), undefined, [])
-        ),
-      ])
-    )
-  }
-
-  public generateModelMethod(modelName: string, methodName: string) {
+  public generateModelMethod(modelName: string, methodName: string): ts.MethodDeclaration {
     return ts.factory.createMethodDeclaration(
       /* modifiers */ [
         ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
@@ -229,13 +125,132 @@ export default class ServiceGenerator {
   }
 
   /**
+   * @description Given a model name generates its service class.
+   * @param {string} modelName
+   * @returns {ts.ClassDeclaration}
+   */
+  private __modelServiceClass(modelName: string): ts.ClassDeclaration {
+    const model = this.prismaService.getModel(modelName)
+    return ts.factory.createClassDeclaration(
+      [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+      `${capitalize(modelName)}Service`,
+      [],
+      [],
+      model
+        ? [
+            this.__constructor,
+            ...['findMany', 'findUnique', 'create', 'update', 'delete'].map((method) =>
+              this.generateModelMethod(model.name, method)
+            ),
+            ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name) ? this.__getterMethod(model.name, field) : []
+              ),
+            ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name) ? this.__setterMethod(model.name, field) : []
+              ),
+          ].flat(2)
+        : []
+    )
+  }
+
+  /**
+   * @description Get import declaration for one or more Prisma model, by default all models will be included.
+   * @param {string[]} models Prisma models to included in the import declaration.
+   * @returns {ts.ImportDeclaration}
+   */
+  private __prismaClientModelsImport(
+    models: string[] = this.prismaService.models.map((m) => m.name)
+  ): ts.ImportDeclaration {
+    return ts.factory.createImportDeclaration(
+      undefined,
+      ts.factory.createImportClause(
+        true,
+        undefined,
+        ts.factory.createNamedImports(
+          models.map((model) =>
+            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(capitalize(model)))
+          )
+        )
+      ),
+      ts.factory.createStringLiteral('@prisma/client')
+    )
+  }
+
+  /**
+   * @description Generates Prisma client import declaration:
+   * import { PrismaClient } from '@prisma/client'
+   * @returns {ts.ImportDeclaration}
+   */
+  private get __prismaClientImport(): ts.ImportDeclaration {
+    const module = '@prisma/client'
+    const namedImport = 'PrismaClient'
+    return ts.factory.createImportDeclaration(
+      /* modifiers */ undefined,
+      ts.factory.createImportClause(
+        /* isTypeOnly */ false,
+        /* name (default import) */ undefined,
+        ts.factory.createNamedImports([
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(namedImport)),
+        ])
+      ),
+      ts.factory.createStringLiteral(module)
+    )
+  }
+
+  /**
+   * @description Generates service class construtor:
+   * constructor(private prisma = new PrismaClient()) {
+   *  prisma.$connect();
+   * }
+   * @returns {ts.ConstructorDeclaration}
+   */
+  private get __constructor(): ts.ConstructorDeclaration {
+    return ts.factory.createConstructorDeclaration(
+      undefined,
+      [
+        ts.factory.createParameterDeclaration(
+          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)], // Modifier: private
+          undefined,
+          ts.factory.createIdentifier('prisma'), // Parameter name
+          undefined, // Type annotation (optional)
+          undefined,
+          ts.factory.createNewExpression(
+            ts.factory.createIdentifier('PrismaClient'), // Class name for construction
+            undefined, // Type arguments (optional)
+            [] // Empty arguments array
+          )
+        ),
+      ],
+      ts.factory.createBlock(
+        [
+          ts.factory.createExpressionStatement(
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('prisma'),
+                ts.factory.createIdentifier('$connect')
+              ),
+              undefined,
+              []
+            )
+          ),
+        ],
+        true
+      )
+    )
+  }
+
+  /**
    * @description Generates a public class method for getting the given model's field:
    * ex. async function getUserEmail(id: number): Promise<string | null>
    * @param modelName
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  public __getterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private __getterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
     const methodName = `get${capitalize(field.name)}`
     const returnType = ts.factory.createTypeReferenceNode('Promise', [
       ts.factory.createUnionTypeNode([
@@ -273,7 +288,7 @@ export default class ServiceGenerator {
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  public __setterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private __setterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
     const returnType = ts.factory.createTypeReferenceNode('Promise', [
       ts.factory.createTypeReferenceNode(capitalize(modelName), []),
     ])
@@ -315,7 +330,7 @@ export default class ServiceGenerator {
    * @param fieldName
    * @returns {ts.ReturnStatement}
    */
-  public __getModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
+  private __getModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
     return ts.factory.createReturnStatement(
       ts.factory.createBinaryExpression(
         ts.factory.createNonNullExpression(
@@ -372,7 +387,7 @@ export default class ServiceGenerator {
    * @param fieldName
    * @returns {ts.ReturnStatement}
    */
-  public __setModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
+  private __setModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
     const args = ts.factory.createObjectLiteralExpression([
       ts.factory.createPropertyAssignment(
         ts.factory.createIdentifier('where'),
