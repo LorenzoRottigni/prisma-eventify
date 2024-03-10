@@ -16,7 +16,7 @@ export default class ServiceGenerator {
     private configService = new ConfigService(config)
   ) {
     prismaService.models.forEach((model) => {
-      const sourceFile = createSourceFile(`${model.name.toLowerCase()}.resolver.ts`)
+      const sourceFile = createSourceFile(`${model.name.toLowerCase()}.service.ts`)
       this.sourceFiles.push({
         ...sourceFile,
         model: model.name.toLowerCase(),
@@ -59,12 +59,10 @@ export default class ServiceGenerator {
       [],
       model
         ? [
-            ts.factory.createConstructorDeclaration(undefined, [], ts.factory.createBlock([], true)),
-            this.__findAllMethod(model.name),
-            this.__findOneMethod(model.name),
-            this.__createMethod(model.name),
-            this.__updateMethod(model.name),
-            this.__deleteMethod(model.name),
+            this.__constructor,
+            ...['findMany', 'findUnique', 'create', 'update', 'delete'].map((method) =>
+              this.generateModelMethod(model.name, method)
+            ),
             ...model.fields
               .filter((m) => this.configService.modelAllowed(m.name))
               .map((field) =>
@@ -77,6 +75,41 @@ export default class ServiceGenerator {
               ),
           ].flat(2)
         : []
+    )
+  }
+
+  public get __constructor() {
+    return ts.factory.createConstructorDeclaration(
+      undefined,
+      [
+        ts.factory.createParameterDeclaration(
+          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)], // Modifier: private
+          undefined,
+          ts.factory.createIdentifier('prisma'), // Parameter name
+          undefined, // Type annotation (optional)
+          undefined,
+          ts.factory.createNewExpression(
+            ts.factory.createIdentifier('PrismaClient'), // Class name for construction
+            undefined, // Type arguments (optional)
+            [] // Empty arguments array
+          )
+        ),
+      ],
+      ts.factory.createBlock(
+        [
+          ts.factory.createExpressionStatement(
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('prisma'),
+                ts.factory.createIdentifier('$connect')
+              ),
+              undefined,
+              []
+            )
+          ),
+        ],
+        true
+      )
     )
   }
 
@@ -138,186 +171,60 @@ export default class ServiceGenerator {
     )
   }
 
-  /**
-   * @description Generates a class method named `findAll` for the given model:
-   * ex. async function getUsers(): Promise<User[]>
-   * @param modelName
-   * @returns {ts.MethodDeclaration}
-   */
-  public __findAllMethod(modelName: string): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createArrayTypeNode(ts.factory.createTypeReferenceNode(capitalize(modelName), [])),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__findAllStatement(modelName)],
-      true
-    )
-
+  public generateModelMethod(modelName: string, methodName: string) {
     return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      'findAll',
-      undefined,
-      undefined,
-      [],
-      returnType,
-      body
-    )
-  }
-
-  /**
-   * @description Generates a public class method named `findOne` for the given model:
-   * ex. async function findOneUser(id: number): Promise<User | null>
-   * @param modelName
-   * @returns {ts.MethodDeclaration}
-   */
-  public __findOneMethod(modelName: string): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createUnionTypeNode([
-        ts.factory.createTypeReferenceNode(capitalize(modelName), []),
-        ts.factory.createTypeReferenceNode('null'),
+      /* modifiers */ [
+        ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
+        ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword),
+      ],
+      /* asteriskToken */ undefined,
+      /* methodName */ methodName,
+      /* questionToken */ undefined,
+      /* typeParameters */ undefined,
+      /* parameters */ [
+        ts.factory.createParameterDeclaration(
+          /* modifiers */ undefined,
+          /* dotDotDotToken */ undefined,
+          /* name */ 'args',
+          /* questionToken */ undefined,
+          /* type */ ts.factory.createIndexedAccessTypeNode(
+            /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+              /* typeName */ ts.factory.createTypeReferenceNode(
+                `typeof this.prisma.${modelName.toLowerCase()}.${methodName}`
+              ),
+            ]),
+            /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+          ),
+          /* initializer */ methodName === 'findMany' ? ts.factory.createObjectLiteralExpression() : undefined
+        ),
+      ],
+      /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
+        ts.factory.createTypeReferenceNode('ReturnType', [
+          /* typeName */ ts.factory.createTypeReferenceNode(
+            `typeof this.prisma.${modelName.toLowerCase()}.${methodName}<typeof args>`
+          ),
+        ]),
       ]),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__findOneStatement(modelName)],
-      true
-    )
-
-    const idParameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier('id'),
-      undefined,
-      ts.factory.createTypeReferenceNode('number', [])
-    )
-
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      'findOne',
-      undefined,
-      undefined,
-      [idParameter],
-      returnType,
-      body
-    )
-  }
-
-  /**
-   * @description Generates a public class method named `create` for the given model:
-   * ex. async function createUser(user: User): Promise<User>
-   * @param modelName
-   * @returns {ts.MethodDeclaration}
-   */
-  public __createMethod(modelName: string): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createTypeReferenceNode(capitalize(modelName), []),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__createStatement(capitalize(modelName))],
-      true
-    )
-
-    const parameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier(modelName.toLowerCase()),
-      undefined,
-      ts.factory.createTypeReferenceNode(capitalize(modelName), [])
-    )
-
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      'create',
-      undefined,
-      undefined,
-      [parameter],
-      returnType,
-      body
-    )
-  }
-
-  /**
-   * @description Generates a public class method named `update` for the given model:
-   * ex. async function updateUser(id: number, user: User): Promise<User>
-   * @param modelName
-   * @returns {ts.MethodDeclaration}
-   */
-  public __updateMethod(modelName: string): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createTypeReferenceNode(capitalize(modelName), []),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__updateStatement(modelName)],
-      true
-    )
-
-    const idParameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier('id'),
-      undefined,
-      ts.factory.createTypeReferenceNode('number', [])
-    )
-
-    const parameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier(modelName.toLowerCase()),
-      undefined,
-      ts.factory.createTypeReferenceNode(capitalize(modelName), [])
-    )
-
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      'update',
-      undefined,
-      undefined,
-      [idParameter, parameter],
-      returnType,
-      body
-    )
-  }
-
-  /**
-   * @description Generates a public class method named `delete` for the given model:
-   * ex. async function deleteUser(id: number): Promise<User>
-   * @param modelName
-   * @returns {ts.MethodDeclaration}
-   */
-  public __deleteMethod(modelName: string): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createTypeReferenceNode(capitalize(modelName), []),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__deleteStatement(modelName)],
-      true
-    )
-
-    const idParameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier('id'),
-      undefined,
-      ts.factory.createTypeReferenceNode('number', [])
-    )
-
-    return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      'delete',
-      undefined,
-      undefined,
-      [idParameter],
-      returnType,
-      body
+      /* body */ ts.factory.createBlock(
+        [
+          /* return */ ts.factory.createReturnStatement(
+            /* await */ ts.factory.createAwaitExpression(
+              ts.factory.createCallExpression(
+                /* expression */ ts.factory.createPropertyAccessExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createIdentifier('this.prisma'),
+                    ts.factory.createIdentifier(modelName.toLowerCase())
+                  ),
+                  ts.factory.createIdentifier(`${methodName}<typeof args>`)
+                ),
+                /* typeArgs */ undefined,
+                /* args */ [ts.factory.createIdentifier('args')]
+              )
+            )
+          ),
+        ],
+        /* multiline */ true
+      )
     )
   }
 
@@ -337,10 +244,7 @@ export default class ServiceGenerator {
       ]),
     ])
 
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__getModelFieldStatement(modelName, field.name)],
-      true
-    )
+    const body: ts.Block = ts.factory.createBlock([this.__getModelFieldStatement(modelName, field.name)], true)
 
     const idParameter = ts.factory.createParameterDeclaration(
       undefined,
@@ -374,10 +278,7 @@ export default class ServiceGenerator {
       ts.factory.createTypeReferenceNode(capitalize(modelName), []),
     ])
 
-    const body: ts.Block = ts.factory.createBlock(
-      [this.__prismaClientStatement, this.__setModelFieldStatement(modelName, field.name)],
-      true
-    )
+    const body: ts.Block = ts.factory.createBlock([this.__setModelFieldStatement(modelName, field.name)], true)
 
     const idParameter = ts.factory.createParameterDeclaration(
       undefined,
@@ -408,167 +309,6 @@ export default class ServiceGenerator {
   }
 
   /**
-   * @description Generates the prisma.<model>.findAll statement for the given model:
-   * ex. return await prisma.user.findMany();
-   * @param modelName
-   * @returns {ts.ReturnStatement}
-   */
-  public __findAllStatement(modelName: string): ts.ReturnStatement {
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('findMany')
-          ),
-          undefined,
-          []
-        )
-      )
-    )
-  }
-
-  /**
-   * @description Generates the prisma.<model>.findUnique statement for the given model:
-   * ex. return await prisma.user.findUnique();
-   * @param modelName
-   * @returns {ts.ReturnStatement}
-   */
-  public __findOneStatement(modelName: string): ts.ReturnStatement {
-    const idIdentifier = ts.factory.createIdentifier('id')
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('findUnique')
-          ),
-          undefined,
-          [
-            ts.factory.createObjectLiteralExpression([
-              ts.factory.createPropertyAssignment(
-                'where',
-                ts.factory.createObjectLiteralExpression([ts.factory.createPropertyAssignment('id', idIdentifier)])
-              ),
-            ]),
-          ]
-        )
-      )
-    )
-  }
-
-  /**
-   * @description Generates the prisma.<model>.create statement for the given model:
-   * ex. return await prisma.user.create({ data: user });
-   * @param modelName
-   * @returns {ts.ReturnStatement}
-   */
-  public __createStatement(modelName: string): ts.ReturnStatement {
-    const args = ts.factory.createObjectLiteralExpression([
-      ts.factory.createPropertyAssignment(
-        ts.factory.createIdentifier('data'),
-        ts.factory.createIdentifier(modelName.toLowerCase())
-      ),
-    ])
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('create')
-          ),
-          undefined,
-          [args]
-        )
-      )
-    )
-  }
-
-  /**
-   * @description Generates the prisma.<model>.update statement for the given model:
-   * ex. return await prisma.user.update({ where: { id: id }, data: user });
-   * @param modelName
-   * @returns {ts.ReturnStatement}
-   */
-  public __updateStatement(modelName: string): ts.ReturnStatement {
-    const args = ts.factory.createObjectLiteralExpression([
-      ts.factory.createPropertyAssignment(
-        ts.factory.createIdentifier('where'),
-        ts.factory.createObjectLiteralExpression([
-          ts.factory.createPropertyAssignment(
-            ts.factory.createIdentifier('id'),
-            ts.factory.createIdentifier('id') // Assuming id field for update condition
-          ),
-        ])
-      ),
-      ts.factory.createPropertyAssignment(
-        ts.factory.createIdentifier('data'),
-        ts.factory.createIdentifier(modelName.toLowerCase())
-      ),
-    ])
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('update')
-          ),
-          undefined,
-          [args]
-        )
-      )
-    )
-  }
-
-  /**
-   * @description Generates the prisma.<model>.delete statement for the given model:
-   * ex. return await prisma.user.delete({ where: { id: id } });
-   * @param modelName
-   * @returns {ts.ReturnStatement}
-   */
-  public __deleteStatement(modelName: string): ts.ReturnStatement {
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('delete')
-          ),
-          undefined,
-          [
-            ts.factory.createObjectLiteralExpression([
-              ts.factory.createPropertyAssignment(
-                ts.factory.createIdentifier('where'),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment(
-                    ts.factory.createIdentifier('id'),
-                    ts.factory.createIdentifier('id')
-                  ),
-                ])
-              ),
-            ]),
-          ]
-        )
-      )
-    )
-  }
-
-  /**
    * @description Generates fields getters for the given model:
    * ex. async function getUserUsername(id: number): Promise<string | null>
    * @param modelName
@@ -585,7 +325,7 @@ export default class ServiceGenerator {
                 ts.factory.createCallExpression(
                   ts.factory.createPropertyAccessExpression(
                     ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('prisma'),
+                      ts.factory.createIdentifier('this.prisma'),
                       ts.factory.createIdentifier(modelName.toLowerCase())
                     ),
                     ts.factory.createIdentifier('findUnique')
@@ -655,7 +395,7 @@ export default class ServiceGenerator {
         ts.factory.createCallExpression(
           ts.factory.createPropertyAccessExpression(
             ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('prisma'),
+              ts.factory.createIdentifier('this.prisma'),
               ts.factory.createIdentifier(modelName.toLowerCase())
             ),
             ts.factory.createIdentifier('update')
