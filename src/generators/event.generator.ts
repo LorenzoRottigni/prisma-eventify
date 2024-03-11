@@ -44,11 +44,15 @@ export class EventGenerator implements EventifyGenerator {
    */
   public generateEventDefinition(
     modelName: string,
-    fieldName: string,
-    hook: GeneratorHook,
-    method: PrismaAPI,
-    eventName = `${modelName.toLowerCase()}.${fieldName}.${hook}.${method}`,
-    exportName = `${capitalize(modelName)}${capitalize(fieldName)}${capitalize(hook)}${capitalize(method)}`
+    fieldName: string | undefined,
+    hook: GeneratorHook | undefined,
+    method: PrismaAPI | undefined,
+    eventName = `${modelName.toLowerCase()}${fieldName ? `.${fieldName}` : ''}${hook ? `.${hook}` : ''}${
+      method ? `.${method}` : ''
+    }`,
+    exportName = `${capitalize(modelName)}${fieldName ? capitalize(fieldName) : ''}${hook ? capitalize(hook) : ''}${
+      method ? capitalize(method) : ''
+    }`
   ): ts.VariableStatement {
     const args = [
       ts.factory.createPropertySignature(
@@ -126,15 +130,26 @@ export class EventGenerator implements EventifyGenerator {
           this.createEventDefinitionImport,
           ...this.prismaService.models
             .map(({ fields, name: modelName }) =>
-              fields.map(({ name: fieldName }) =>
-                this.configService.fieldAllowed(modelName, fieldName)
-                  ? Object.values(PrismaAPI).map((method) =>
+              this.configService.modelAllowed(modelName)
+                ? [
+                    /* Generates event names combining model, hook, method */
+                    ...Object.values(PrismaAPI).map((method) =>
                       Object.values(GeneratorHook).map((hook) =>
-                        this.generateEventDefinition(modelName, fieldName, hook, method)
+                        this.generateEventDefinition(modelName, undefined, hook, method)
                       )
-                    )
-                  : []
-              )
+                    ),
+                    /* Generates event names combining model, field, hook, method */
+                    ...fields.map(({ name: fieldName }) =>
+                      this.configService.fieldAllowed(modelName, fieldName)
+                        ? [PrismaAPI.create, PrismaAPI.delete, PrismaAPI.update].map((method) =>
+                            Object.values(GeneratorHook).map((hook) =>
+                              this.generateEventDefinition(modelName, fieldName, hook, method)
+                            )
+                          )
+                        : []
+                    ),
+                  ]
+                : []
             )
             .flat(4),
         ]),

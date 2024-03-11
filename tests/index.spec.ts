@@ -6,7 +6,7 @@ import fs from 'fs'
 import { PrismaService } from '../src/services/prisma.service'
 import { ConfigService } from '../src/services/config.service'
 import { EventGenerator } from '../src/generators/event.generator'
-import { BusController } from '../src/bus/index'
+import { BusHandler } from '../src/handlers/bus.handler'
 
 describe('Model Services Generator', () => {
   it('Should generate services bundle.', async () => {
@@ -32,7 +32,7 @@ describe('Model Services Generator', () => {
     const schema = await getDMMF({ datamodel })
     const prismaService = new PrismaService(schema)
     const configService = new ConfigService(config)
-    const busController = new BusController(prismaService, configService)
-    expect(busController.generateBundle()).toBeTruthy()
+    const busHandler = new BusHandler(prismaService, configService)
+    expect(busHandler.generateBundle()).toBeTruthy()
   })
 })

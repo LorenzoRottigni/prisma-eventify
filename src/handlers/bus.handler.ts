@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { ConfigService } from '../services/config.service'
 import { PrismaService } from '../services/prisma.service'
 
-export class BusController {
+export class BusHandler {
   constructor(
     private prismaService: PrismaService,
     private configService: ConfigService,
@@ -35,14 +35,7 @@ export class BusController {
   public generateEventsConfiguration(): boolean {
     try {
       // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
-
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
-      const eventsConfig: ts.ObjectLiteralElementLike[] = Object.keys(events).map((eventName) =>
-        ts.factory.createPropertyAssignment(
-          ts.factory.createStringLiteral(eventName),
-          ts.factory.createIdentifier('() => {}')
-        )
-      )
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
@@ -56,7 +49,15 @@ export class BusController {
                   ts.factory.createIdentifier('config'),
                   undefined,
                   ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
-                  ts.factory.createObjectLiteralExpression(eventsConfig, true)
+                  ts.factory.createObjectLiteralExpression(
+                    Object.keys(events).map((eventName) =>
+                      ts.factory.createPropertyAssignment(
+                        ts.factory.createStringLiteral(eventName),
+                        ts.factory.createIdentifier('() => {}')
+                      )
+                    ),
+                    true
+                  )
                 ),
               ],
               ts.NodeFlags.Const
