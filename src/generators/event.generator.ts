@@ -1,10 +1,10 @@
 import { EventBus } from 'ts-bus'
 import { PrismaService } from '../services/prisma.service'
 import { ConfigService } from '../services/config.service'
-import { EventifyGenerator } from '../types'
+import { EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
 import ts from 'typescript'
 import fs from 'fs'
-import { createSourceFile } from '../utils'
+import { capitalize, createSourceFile } from '../utils'
 
 export class EventGenerator implements EventifyGenerator {
   constructor(
@@ -14,7 +14,12 @@ export class EventGenerator implements EventifyGenerator {
     private sourceFile: ts.SourceFile = createSourceFile('events.ts')
   ) {}
 
-  private get __importCreateEventDefinition(): ts.ImportDeclaration {
+  /**
+   * @description Generates import from ts-bus:
+   * import { createEventDefinition } from "ts-bus";
+   * @returns {ts.ImportDeclaration}
+   */
+  private get createEventDefinitionImport(): ts.ImportDeclaration {
     return ts.factory.createImportDeclaration(
       undefined,
       ts.factory.createImportClause(
@@ -28,90 +33,100 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
-  private __event(): ts.Statement[] {
-    // Create the type literal node for the event payload
-    const typeLiteral = ts.factory.createTypeLiteralNode([
+  /**
+   * @description Generates an event definition for the event bus:
+   * <modelName>.<fieldName>.<hook>.<method>
+   * @param {string} modelName
+   * @param {string} fieldName
+   * @param {GeneratorHook} hook
+   * @param {PrismaAPI} method
+   * @param {string} eventName
+   * @param {string} exportName
+   * @returns {ts.VariableStatement}
+   */
+  public generateEventDefinition(
+    modelName: string,
+    fieldName: string,
+    hook: GeneratorHook,
+    method: PrismaAPI,
+    eventName = `${modelName.toLowerCase()}.${fieldName}.${hook}.${method}`,
+    exportName = `${capitalize(modelName)}${capitalize(fieldName)}${capitalize(hook)}${capitalize(method)}`
+  ): ts.VariableStatement {
+    const args = [
       ts.factory.createPropertySignature(
         undefined,
-        'id',
+        ts.factory.createIdentifier('args'),
         undefined,
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
       ),
       ts.factory.createPropertySignature(
         undefined,
-        'listId',
+        ts.factory.createIdentifier('ctx'),
         undefined,
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
       ),
-      ts.factory.createPropertySignature(
-        undefined,
-        'value',
-        undefined,
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
-      ),
-    ])
+    ]
 
-    // Create an object literal expression using the typeLiteral
-    const objectLiteral = ts.factory.createObjectLiteralExpression([
-      ts.factory.createPropertyAssignment('id', ts.factory.createIdentifier('id')),
-      ts.factory.createPropertyAssignment('listId', ts.factory.createIdentifier('listId')),
-      ts.factory.createPropertyAssignment('value', ts.factory.createIdentifier('value')),
-    ])
+    if (hook === GeneratorHook.after)
+      args.push(
+        ts.factory.createPropertySignature(
+          undefined,
+          ts.factory.createIdentifier('result'),
+          undefined,
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+        )
+      )
 
-    // Create the createEventDefinition function call
-    const createEventDefinitionCall = ts.factory.createCallExpression(
-      ts.factory.createIdentifier('createEventDefinition'),
-      [],
-      [ts.factory.createParenthesizedExpression(objectLiteral)]
-    )
-
-    // Create the type annotation for taskCreated
-    const ReturnType = ts.factory.createTypeReferenceNode('ReturnType', [typeLiteral])
-
-    // Create the variable declaration for taskCreated
-    const taskCreatedDeclaration = ts.factory.createVariableDeclaration(
-      'taskCreated',
-      undefined,
-      ReturnType,
-      createEventDefinitionCall
-    )
-
-    // Create the variable statement
-    const taskCreatedStatement = ts.factory.createVariableStatement(undefined, [taskCreatedDeclaration])
-
-    // Create the export specifier
-    const exportSpecifier = ts.factory.createExportSpecifier(false, 'taskCreated', 'pippo')
-
-    // Create the named exports
-    const namedExports = ts.factory.createNamedExports([exportSpecifier])
-
-    // Create the export statement wrapping the named exports in an expression context
-    const exportStatement = ts.factory.createExportDeclaration(
-      undefined,
-      false,
-      undefined,
-      ts.factory.createIdentifier('dummy') // This is a placeholder expression
-    )
-
-    // Return an array of nodes to be added to the source file
-    return [taskCreatedStatement, exportStatement]
-  }
-
-  private __export() {
-    return ts.factory.createExportDeclaration(
-      undefined,
-      false,
-      ts.factory.createNamedExports([ts.factory.createExportSpecifier(false, 'taskCreated', 'thename')])
+    return ts.factory.createVariableStatement(
+      [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+      ts.factory.createVariableDeclarationList(
+        [
+          ts.factory.createVariableDeclaration(
+            ts.factory.createIdentifier(exportName),
+            undefined,
+            undefined,
+            ts.factory.createCallExpression(
+              ts.factory.createCallExpression(
+                ts.factory.createIdentifier('createEventDefinition'),
+                [ts.factory.createTypeLiteralNode(args)],
+                []
+              ),
+              undefined,
+              [ts.factory.createStringLiteral(eventName)]
+            )
+          ),
+        ],
+        ts.NodeFlags.Const
+      )
     )
   }
 
+  /**
+   * @description Generates events bundle.
+   * @returns {boolean} Generation status.
+   */
   public generateBundle(): boolean {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
       const filename = this.configService.buildPath(this.sourceFile.fileName)
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
-        ts.factory.updateSourceFile(this.sourceFile, [this.__importCreateEventDefinition, ...this.__event()]),
+        ts.factory.updateSourceFile(this.sourceFile, [
+          this.createEventDefinitionImport,
+          ...this.prismaService.models
+            .map(({ fields, name: modelName }) =>
+              fields.map(({ name: fieldName }) =>
+                this.configService.fieldAllowed(modelName, fieldName)
+                  ? Object.values(PrismaAPI).map((method) =>
+                      Object.values(GeneratorHook).map((hook) =>
+                        this.generateEventDefinition(modelName, fieldName, hook, method)
+                      )
+                    )
+                  : []
+              )
+            )
+            .flat(4),
+        ]),
         this.sourceFile
       )
       fs.writeFileSync(filename, file)

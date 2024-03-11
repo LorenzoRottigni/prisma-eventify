@@ -4,4 +4,5 @@ export declare interface EventifyConfig {
   excludeFields: string[]
   excludeModels: string[]
   outDir: string
+  context?: unknown
 }

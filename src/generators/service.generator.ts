@@ -2,7 +2,7 @@ import { PrismaService } from '../services/prisma.service'
 import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
-import { EventifySourceFile } from '../types'
+import { EventifySourceFile, PrismaAPI } from '../types'
 import { ConfigService } from '../services/config.service'
 
 export default class ServiceGenerator {
@@ -38,9 +38,9 @@ export default class ServiceGenerator {
         const file = printer.printNode(
           ts.EmitHint.SourceFile,
           ts.factory.updateSourceFile(sourceFile, [
-            this.__prismaClientImport,
-            this.__prismaClientModelsImport([sourceFile.model]),
-            this.__modelServiceClass(sourceFile.model),
+            this.prismaClientImport,
+            this.generatePrismaClientModelsImport([sourceFile.model]),
+            this.generateModelServiceClass(sourceFile.model),
           ]),
           sourceFile
         )
@@ -122,7 +122,7 @@ export default class ServiceGenerator {
    * @param {string} modelName
    * @returns {ts.ClassDeclaration}
    */
-  private __modelServiceClass(modelName: string): ts.ClassDeclaration {
+  private generateModelServiceClass(modelName: string): ts.ClassDeclaration {
     const model = this.prismaService.getModel(modelName)
     return ts.factory.createClassDeclaration(
       [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -131,19 +131,21 @@ export default class ServiceGenerator {
       [],
       model
         ? [
-            this.__constructor,
-            ...['findMany', 'findUnique', 'create', 'update', 'delete'].map((method) =>
-              this.generateModelMethod(model.name, method)
-            ),
+            this.serviceConstructor,
+            ...Object.values(PrismaAPI).map((method) => this.generateModelMethod(model.name, method)),
             ...model.fields
               .filter((m) => this.configService.modelAllowed(m.name))
               .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name) ? this.__getterMethod(model.name, field) : []
+                this.configService.fieldAllowed(model.name, field.name)
+                  ? this.generateFieldGetterMethod(model.name, field)
+                  : []
               ),
             ...model.fields
               .filter((m) => this.configService.modelAllowed(m.name))
               .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name) ? this.__setterMethod(model.name, field) : []
+                this.configService.fieldAllowed(model.name, field.name)
+                  ? this.generateFieldSetterMethod(model.name, field)
+                  : []
               ),
           ].flat(2)
         : []
@@ -155,7 +157,7 @@ export default class ServiceGenerator {
    * @param {string[]} models Prisma models to included in the import declaration.
    * @returns {ts.ImportDeclaration}
    */
-  private __prismaClientModelsImport(
+  private generatePrismaClientModelsImport(
     models: string[] = this.prismaService.models.map((m) => m.name)
   ): ts.ImportDeclaration {
     return ts.factory.createImportDeclaration(
@@ -178,7 +180,7 @@ export default class ServiceGenerator {
    * import { PrismaClient } from '@prisma/client'
    * @returns {ts.ImportDeclaration}
    */
-  private get __prismaClientImport(): ts.ImportDeclaration {
+  private get prismaClientImport(): ts.ImportDeclaration {
     const module = '@prisma/client'
     const namedImport = 'PrismaClient'
     return ts.factory.createImportDeclaration(
@@ -201,7 +203,7 @@ export default class ServiceGenerator {
    * }
    * @returns {ts.ConstructorDeclaration}
    */
-  private get __constructor(): ts.ConstructorDeclaration {
+  private get serviceConstructor(): ts.ConstructorDeclaration {
     return ts.factory.createConstructorDeclaration(
       undefined,
       [
@@ -243,7 +245,7 @@ export default class ServiceGenerator {
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  private __getterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private generateFieldGetterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
     const methodName = `get${capitalize(field.name)}`
     const returnType = ts.factory.createTypeReferenceNode('Promise', [
       ts.factory.createUnionTypeNode([
@@ -281,7 +283,7 @@ export default class ServiceGenerator {
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  private __setterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private generateFieldSetterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
     const returnType = ts.factory.createTypeReferenceNode('Promise', [
       ts.factory.createTypeReferenceNode(capitalize(modelName), []),
     ])

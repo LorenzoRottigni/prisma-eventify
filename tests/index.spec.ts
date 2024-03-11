@@ -14,7 +14,9 @@ describe('Model Services Generator', () => {
     const configService = new ConfigService(config)
     const generator = new ServiceGenerator(prismaService, configService)
     expect(generator.generateBundle()).toBe(true)
-    expect(fs.readdirSync(config.outDir).length).toBe(schema.datamodel.models.length - config.excludeModels.length)
+    expect(fs.readdirSync(config.outDir).filter((f) => f.includes('.service')).length).toBe(
+      schema.datamodel.models.length - config.excludeModels.length
+    )
   })
 
   it('Should generate events bundle.', async () => {
