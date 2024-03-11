@@ -57,7 +57,14 @@ export class EventGenerator implements EventifyGenerator {
         undefined,
         ts.factory.createIdentifier('args'),
         undefined,
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+        /* type */ ts.factory.createIndexedAccessTypeNode(
+          /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+            /* typeName */ ts.factory.createTypeReferenceNode(
+              `typeof this.prisma.${modelName.toLowerCase()}.${method}`
+            ),
+          ]),
+          /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+        )
       ),
       ts.factory.createPropertySignature(
         undefined,
@@ -73,7 +80,13 @@ export class EventGenerator implements EventifyGenerator {
           undefined,
           ts.factory.createIdentifier('result'),
           undefined,
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+          /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
+            ts.factory.createTypeReferenceNode('ReturnType', [
+              /* typeName */ ts.factory.createTypeReferenceNode(
+                `typeof this.prisma.${modelName.toLowerCase()}.${method}`
+              ),
+            ]),
+          ])
         )
       )
 

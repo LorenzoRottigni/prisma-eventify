@@ -246,33 +246,82 @@ export default class ServiceGenerator {
    * @returns {ts.MethodDeclaration}
    */
   private generateFieldGetterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
-    const methodName = `get${capitalize(field.name)}`
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createUnionTypeNode([
-        this.prismaService.prismaToTSType(field.type),
-        ts.factory.createTypeReferenceNode('null'),
-      ]),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock([this.__getModelFieldStatement(modelName, field.name)], true)
-
-    const idParameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier('id'),
-      undefined,
-      ts.factory.createTypeReferenceNode('number', [])
-    )
-
     return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      methodName,
-      undefined,
-      undefined,
-      [idParameter],
-      returnType,
-      body
+      /* modifiers */ [
+        ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
+        ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword),
+      ],
+      /* asteriskToken */ undefined,
+      /* methodName */ `get${capitalize(field.name)}`,
+      /* questionToken */ undefined,
+      /* typeParams */ undefined,
+      /* params */ [
+        ts.factory.createParameterDeclaration(
+          undefined,
+          undefined,
+          ts.factory.createIdentifier('id'),
+          undefined,
+          ts.factory.createTypeReferenceNode('number', [])
+        ),
+      ],
+      /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
+        ts.factory.createUnionTypeNode([
+          this.prismaService.prismaToTSType(field.type),
+          ts.factory.createTypeReferenceNode('null'),
+        ]),
+      ]),
+      /* body */ ts.factory.createBlock(
+        [
+          ts.factory.createReturnStatement(
+            ts.factory.createBinaryExpression(
+              ts.factory.createNonNullExpression(
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createNonNullExpression(
+                    ts.factory.createAwaitExpression(
+                      ts.factory.createCallExpression(
+                        ts.factory.createPropertyAccessExpression(
+                          ts.factory.createPropertyAccessExpression(
+                            ts.factory.createIdentifier('this.prisma'),
+                            ts.factory.createIdentifier(modelName.toLowerCase())
+                          ),
+                          ts.factory.createIdentifier('findUnique')
+                        ),
+                        undefined,
+                        [
+                          ts.factory.createObjectLiteralExpression([
+                            ts.factory.createPropertyAssignment(
+                              ts.factory.createIdentifier('where'),
+                              ts.factory.createObjectLiteralExpression([
+                                ts.factory.createPropertyAssignment(
+                                  ts.factory.createIdentifier('id'),
+                                  ts.factory.createIdentifier('id')
+                                ),
+                              ])
+                            ),
+                            ts.factory.createPropertyAssignment(
+                              ts.factory.createIdentifier('select'),
+                              ts.factory.createObjectLiteralExpression([
+                                ts.factory.createPropertyAssignment(
+                                  ts.factory.createIdentifier(field.name),
+                                  ts.factory.createTrue()
+                                ),
+                              ])
+                            ),
+                          ]),
+                        ]
+                      )
+                    )
+                  ),
+                  ts.factory.createIdentifier(field.name)
+                )
+              ),
+              ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
+              ts.factory.createNull()
+            )
+          ),
+        ],
+        true
+      )
     )
   }
 
@@ -284,135 +333,74 @@ export default class ServiceGenerator {
    * @returns {ts.MethodDeclaration}
    */
   private generateFieldSetterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
-    const returnType = ts.factory.createTypeReferenceNode('Promise', [
-      ts.factory.createTypeReferenceNode(capitalize(modelName), []),
-    ])
-
-    const body: ts.Block = ts.factory.createBlock([this.__setModelFieldStatement(modelName, field.name)], true)
-
-    const idParameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier('id'),
-      undefined,
-      ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
-    )
-
-    const parameter = ts.factory.createParameterDeclaration(
-      undefined,
-      undefined,
-      ts.factory.createIdentifier(modelName.toLowerCase()),
-      undefined,
-      this.prismaService.prismaToTSType(field.type)
-    )
-
     return ts.factory.createMethodDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.PublicKeyword), ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword)],
-      undefined,
-      `set${capitalize(field.name)}`,
-      undefined,
-      undefined,
-      [idParameter, parameter],
-      returnType,
-      body
-    )
-  }
-
-  /**
-   * @description Generates fields getters for the given model:
-   * ex. async function getUserUsername(id: number): Promise<string | null>
-   * @param modelName
-   * @param fieldName
-   * @returns {ts.ReturnStatement}
-   */
-  private __getModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
-    return ts.factory.createReturnStatement(
-      ts.factory.createBinaryExpression(
-        ts.factory.createNonNullExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createNonNullExpression(
-              ts.factory.createAwaitExpression(
-                ts.factory.createCallExpression(
-                  ts.factory.createPropertyAccessExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('this.prisma'),
-                      ts.factory.createIdentifier(modelName.toLowerCase())
-                    ),
-                    ts.factory.createIdentifier('findUnique')
-                  ),
-                  undefined,
-                  [
-                    ts.factory.createObjectLiteralExpression([
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier('where'),
-                        ts.factory.createObjectLiteralExpression([
-                          ts.factory.createPropertyAssignment(
-                            ts.factory.createIdentifier('id'),
-                            ts.factory.createIdentifier('id') // Assuming id field for lookup
-                          ),
-                        ])
-                      ),
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createIdentifier('select'),
-                        ts.factory.createObjectLiteralExpression([
-                          ts.factory.createPropertyAssignment(
-                            ts.factory.createIdentifier(fieldName),
-                            ts.factory.createTrue()
-                          ),
-                        ])
-                      ),
-                    ]),
-                  ]
-                )
-              )
-            ),
-            ts.factory.createIdentifier(fieldName)
-          )
-        ),
-        ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
-        ts.factory.createNull()
-      )
-    )
-  }
-
-  /**
-   * @description Generates fields setters for the given model:
-   * ex. return (await prisma.user.findUnique({ where: { id: id }, select: { username: true } }))!.username! ?? null;
-   * @param modelName
-   * @param fieldName
-   * @returns {ts.ReturnStatement}
-   */
-  private __setModelFieldStatement(modelName: string, fieldName: string): ts.ReturnStatement {
-    const args = ts.factory.createObjectLiteralExpression([
-      ts.factory.createPropertyAssignment(
-        ts.factory.createIdentifier('where'),
-        ts.factory.createObjectLiteralExpression([
-          ts.factory.createPropertyAssignment(ts.factory.createIdentifier('id'), ts.factory.createIdentifier('id')),
-        ])
-      ),
-      ts.factory.createPropertyAssignment(
-        ts.factory.createIdentifier('data'),
-        ts.factory.createObjectLiteralExpression([
-          ts.factory.createPropertyAssignment(
-            ts.factory.createIdentifier(fieldName),
-            ts.factory.createIdentifier(modelName.toLowerCase())
-          ),
-        ])
-      ),
-    ])
-    return ts.factory.createReturnStatement(
-      ts.factory.createAwaitExpression(
-        ts.factory.createCallExpression(
-          ts.factory.createPropertyAccessExpression(
-            ts.factory.createPropertyAccessExpression(
-              ts.factory.createIdentifier('this.prisma'),
-              ts.factory.createIdentifier(modelName.toLowerCase())
-            ),
-            ts.factory.createIdentifier('update')
-          ),
+      /* modifiers */ [
+        ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
+        ts.factory.createModifier(ts.SyntaxKind.AsyncKeyword),
+      ],
+      /* asteriskToken */ undefined,
+      /* methodName */ `set${capitalize(field.name)}`,
+      /* questionToken */ undefined,
+      /* typeParams */ undefined,
+      /* params */ [
+        ts.factory.createParameterDeclaration(
           undefined,
-          [args]
-        )
+          undefined,
+          ts.factory.createIdentifier('id'),
+          undefined,
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+        ),
+        ts.factory.createParameterDeclaration(
+          undefined,
+          undefined,
+          ts.factory.createIdentifier(modelName.toLowerCase()),
+          undefined,
+          this.prismaService.prismaToTSType(field.type)
+        ),
+      ],
+      /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
+        ts.factory.createTypeReferenceNode(capitalize(modelName), []),
+      ]),
+      /* body */ ts.factory.createBlock(
+        [
+          ts.factory.createReturnStatement(
+            ts.factory.createAwaitExpression(
+              ts.factory.createCallExpression(
+                ts.factory.createPropertyAccessExpression(
+                  ts.factory.createPropertyAccessExpression(
+                    ts.factory.createIdentifier('this.prisma'),
+                    ts.factory.createIdentifier(modelName.toLowerCase())
+                  ),
+                  ts.factory.createIdentifier('update')
+                ),
+                undefined,
+                [
+                  ts.factory.createObjectLiteralExpression([
+                    ts.factory.createPropertyAssignment(
+                      ts.factory.createIdentifier('where'),
+                      ts.factory.createObjectLiteralExpression([
+                        ts.factory.createPropertyAssignment(
+                          ts.factory.createIdentifier('id'),
+                          ts.factory.createIdentifier('id')
+                        ),
+                      ])
+                    ),
+                    ts.factory.createPropertyAssignment(
+                      ts.factory.createIdentifier('data'),
+                      ts.factory.createObjectLiteralExpression([
+                        ts.factory.createPropertyAssignment(
+                          ts.factory.createIdentifier(field.name),
+                          ts.factory.createIdentifier(modelName.toLowerCase())
+                        ),
+                      ])
+                    ),
+                  ]),
+                ]
+              )
+            )
+          ),
+        ],
+        true
       )
     )
   }
