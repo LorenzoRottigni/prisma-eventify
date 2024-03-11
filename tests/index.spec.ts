@@ -6,6 +6,7 @@ import fs from 'fs'
 import { PrismaService } from '../src/services/prisma.service'
 import { ConfigService } from '../src/services/config.service'
 import { EventGenerator } from '../src/generators/event.generator'
+import { BusController } from '../src/bus/index'
 
 describe('Model Services Generator', () => {
   it('Should generate services bundle.', async () => {
@@ -25,5 +26,10 @@ describe('Model Services Generator', () => {
     const configService = new ConfigService(config)
     const generator = new EventGenerator(prismaService, configService)
     expect(generator.generateBundle()).toBe(true)
+  })
+
+  it('Should generate configuration bundle.', async () => {
+    const busController = new BusController()
+    expect(busController.generateEventsConfiguration()).toBeTruthy()
   })
 })

@@ -1,4 +1,3 @@
-import { EventBus } from 'ts-bus'
 import { PrismaService } from '../services/prisma.service'
 import { ConfigService } from '../services/config.service'
 import { EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
@@ -10,7 +9,6 @@ export class EventGenerator implements EventifyGenerator {
   constructor(
     private prismaService: PrismaService,
     private configService: ConfigService,
-    private bus = new EventBus(),
     private sourceFile: ts.SourceFile = createSourceFile('events.ts')
   ) {}
 
