@@ -32,10 +32,32 @@ export class BusHandler {
     return ![this.generateEventsConfigurationTypes(), this.generateEventsConfiguration()].includes(false)
   }
 
+  private destructureEventName(event: string): { model: string; field?: string; hook?: string; method?: string } {
+    const chunks = event.split('.')
+    return chunks.length <= 3
+      ? {
+          model: chunks[0],
+          hook: chunks?.[1],
+          method: chunks?.[2],
+        }
+      : {
+          model: chunks[0],
+          field: chunks?.[1],
+          hook: chunks?.[2],
+          method: chunks?.[3],
+        }
+  }
+
   public generateEventsConfiguration(): boolean {
     try {
       // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+
+      console.log(
+        Object.values(events)
+          .map((e) => e.toString())
+          .join('; ')
+      )
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
@@ -51,9 +73,10 @@ export class BusHandler {
                   undefined,
                   ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
                   ts.factory.createObjectLiteralExpression(
-                    Object.keys(events).map((event) =>
-                      ts.factory.createPropertyAssignment(
-                        ts.factory.createStringLiteral(event),
+                    Object.entries(events).map(([eventName, event]) => {
+                      const { model, method } = this.destructureEventName(event.toString())
+                      return ts.factory.createPropertyAssignment(
+                        ts.factory.createStringLiteral(eventName),
                         ts.factory.createArrowFunction(
                           undefined,
                           undefined,
@@ -63,7 +86,14 @@ export class BusHandler {
                               undefined,
                               'args',
                               undefined,
-                              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                              ts.factory.createIndexedAccessTypeNode(
+                                /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                                  /* typeName */ ts.factory.createTypeReferenceNode(
+                                    `typeof prisma.${model.toLowerCase()}.${method}`
+                                  ),
+                                ]),
+                                /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                              )
                             ),
                             ts.factory.createParameterDeclaration(
                               undefined,
@@ -85,7 +115,7 @@ export class BusHandler {
                           ts.factory.createBlock([])
                         )
                       )
-                    ),
+                    }),
                     true
                   )
                 ),
@@ -119,8 +149,9 @@ export class BusHandler {
             ts.factory.createIdentifier('EventsConfig'),
             undefined,
             undefined,
-            Object.keys(events).map((eventName) =>
-              ts.factory.createPropertySignature(
+            Object.entries(events).map(([eventName, event]) => {
+              const { model, method } = this.destructureEventName(event.toString())
+              return ts.factory.createPropertySignature(
                 undefined,
                 ts.factory.createStringLiteral(eventName),
                 undefined,
@@ -134,7 +165,14 @@ export class BusHandler {
                         undefined,
                         'args',
                         undefined,
-                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                        ts.factory.createIndexedAccessTypeNode(
+                          /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                            /* typeName */ ts.factory.createTypeReferenceNode(
+                              `typeof prisma.${model.toLowerCase()}.${method}`
+                            ),
+                          ]),
+                          /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                        )
                       ),
                       ts.factory.createParameterDeclaration(
                         undefined,
@@ -155,7 +193,7 @@ export class BusHandler {
                   ),
                 ])
               )
-            )
+            })
           ),
         ]),
         this.sourceFiles[1]
