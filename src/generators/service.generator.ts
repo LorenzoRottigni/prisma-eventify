@@ -38,8 +38,8 @@ export default class ServiceGenerator {
         const file = printer.printNode(
           ts.EmitHint.SourceFile,
           ts.factory.updateSourceFile(sourceFile, [
-            this.prismaClientImport,
-            this.generatePrismaClientModelsImport([sourceFile.model]),
+            this.prismaService.prismaClientImport(),
+            this.prismaService.generatePrismaClientModelsImport([sourceFile.model]),
             this.generateModelServiceClass(sourceFile.model),
           ]),
           sourceFile
@@ -149,48 +149,6 @@ export default class ServiceGenerator {
               ),
           ].flat(2)
         : []
-    )
-  }
-
-  /**
-   * @description Get import declaration for one or more Prisma model, by default all models will be included.
-   * @param {string[]} models Prisma models to included in the import declaration.
-   * @returns {ts.ImportDeclaration}
-   */
-  private generatePrismaClientModelsImport(
-    models: string[] = this.prismaService.models.map((m) => m.name)
-  ): ts.ImportDeclaration {
-    return ts.factory.createImportDeclaration(
-      undefined,
-      ts.factory.createImportClause(
-        true,
-        undefined,
-        ts.factory.createNamedImports(
-          models.map((model) =>
-            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(capitalize(model)))
-          )
-        )
-      ),
-      ts.factory.createStringLiteral('@prisma/client')
-    )
-  }
-
-  /**
-   * @description Generates Prisma client import declaration:
-   * import { PrismaClient } from '@prisma/client'
-   * @returns {ts.ImportDeclaration}
-   */
-  private get prismaClientImport(): ts.ImportDeclaration {
-    return ts.factory.createImportDeclaration(
-      /* modifiers */ undefined,
-      ts.factory.createImportClause(
-        /* isTypeOnly */ false,
-        /* name (default import) */ undefined,
-        ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('PrismaClient')),
-        ])
-      ),
-      ts.factory.createStringLiteral('@prisma/client')
     )
   }
 

@@ -41,6 +41,7 @@ export class BusHandler {
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(this.sourceFiles[0], [
           this.eventTypeImport,
+          this.prismaService.prismaClientImport(true),
           ts.factory.createVariableStatement(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createVariableDeclarationList(
@@ -50,10 +51,39 @@ export class BusHandler {
                   undefined,
                   ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
                   ts.factory.createObjectLiteralExpression(
-                    Object.keys(events).map((eventName) =>
+                    Object.keys(events).map((event) =>
                       ts.factory.createPropertyAssignment(
-                        ts.factory.createStringLiteral(eventName),
-                        ts.factory.createIdentifier('() => {}')
+                        ts.factory.createStringLiteral(event),
+                        ts.factory.createArrowFunction(
+                          undefined,
+                          undefined,
+                          [
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'args',
+                              undefined,
+                              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                            ),
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'ctx',
+                              undefined,
+                              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                            ),
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'prisma',
+                              undefined,
+                              ts.factory.createTypeReferenceNode('PrismaClient')
+                            ),
+                          ],
+                          undefined,
+                          undefined,
+                          ts.factory.createBlock([])
+                        )
                       )
                     ),
                     true
@@ -83,6 +113,7 @@ export class BusHandler {
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(this.sourceFiles[1], [
+          this.prismaService.prismaClientImport(true),
           ts.factory.createInterfaceDeclaration(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createIdentifier('EventsConfig'),
@@ -96,8 +127,30 @@ export class BusHandler {
                 ts.factory.createUnionTypeNode([
                   ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
                   ts.factory.createFunctionTypeNode(
-                    undefined, // No parameters
-                    [], // No return type annotation
+                    [],
+                    [
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'args',
+                        undefined,
+                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                      ),
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'ctx',
+                        undefined,
+                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                      ),
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'prisma',
+                        undefined,
+                        ts.factory.createTypeReferenceNode('PrismaClient')
+                      ),
+                    ],
                     ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword) // Return type is void
                   ),
                 ])

@@ -74,6 +74,12 @@ export class EventGenerator implements EventifyGenerator {
         undefined,
         ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
       ),
+      ts.factory.createPropertySignature(
+        undefined,
+        ts.factory.createIdentifier('prisma'),
+        undefined,
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+      ),
     ]
 
     if (hook === GeneratorHook.after)

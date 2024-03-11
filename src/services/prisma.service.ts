@@ -1,5 +1,6 @@
 import { DMMF } from '@prisma/generator-helper'
 import ts from 'typescript'
+import { capitalize } from '../utils'
 
 export class PrismaService {
   constructor(public schema: DMMF.Document) {}
@@ -18,6 +19,46 @@ export class PrismaService {
 
   public getModelField(model: string, field: string): Readonly<DMMF.Field> | null {
     return this.getModelFields(model).find((f) => f.name.toLowerCase() === field.toLowerCase()) || null
+  }
+
+  /**
+   * @description Get import declaration for one or more Prisma model, by default all models will be included.
+   * @param {string[]} models Prisma models to included in the import declaration.
+   * @returns {ts.ImportDeclaration}
+   */
+  public generatePrismaClientModelsImport(models: string[] = this.models.map((m) => m.name)): ts.ImportDeclaration {
+    return ts.factory.createImportDeclaration(
+      undefined,
+      ts.factory.createImportClause(
+        true,
+        undefined,
+        ts.factory.createNamedImports(
+          models.map((model) =>
+            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(capitalize(model)))
+          )
+        )
+      ),
+      ts.factory.createStringLiteral('@prisma/client')
+    )
+  }
+
+  /**
+   * @description Generates Prisma client import declaration:
+   * import { PrismaClient } from '@prisma/client'
+   * @returns {ts.ImportDeclaration}
+   */
+  public prismaClientImport(typeOnly = false): ts.ImportDeclaration {
+    return ts.factory.createImportDeclaration(
+      /* modifiers */ undefined,
+      ts.factory.createImportClause(
+        /* isTypeOnly */ typeOnly,
+        /* name (default import) */ undefined,
+        ts.factory.createNamedImports([
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('PrismaClient')),
+        ])
+      ),
+      ts.factory.createStringLiteral('@prisma/client')
+    )
   }
 
   /**
