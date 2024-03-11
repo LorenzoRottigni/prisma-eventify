@@ -29,7 +29,10 @@ describe('Model Services Generator', () => {
   })
 
   it('Should generate configuration bundle.', async () => {
-    const busController = new BusController()
-    expect(busController.generateEventsConfiguration()).toBeTruthy()
+    const schema = await getDMMF({ datamodel })
+    const prismaService = new PrismaService(schema)
+    const configService = new ConfigService(config)
+    const busController = new BusController(prismaService, configService)
+    expect(busController.generateBundle()).toBeTruthy()
   })
 })

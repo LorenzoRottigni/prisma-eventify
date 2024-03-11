@@ -181,18 +181,16 @@ export default class ServiceGenerator {
    * @returns {ts.ImportDeclaration}
    */
   private get prismaClientImport(): ts.ImportDeclaration {
-    const module = '@prisma/client'
-    const namedImport = 'PrismaClient'
     return ts.factory.createImportDeclaration(
       /* modifiers */ undefined,
       ts.factory.createImportClause(
         /* isTypeOnly */ false,
         /* name (default import) */ undefined,
         ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(namedImport)),
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('PrismaClient')),
         ])
       ),
-      ts.factory.createStringLiteral(module)
+      ts.factory.createStringLiteral('@prisma/client')
     )
   }
 
