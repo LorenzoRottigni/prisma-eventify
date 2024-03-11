@@ -5,6 +5,7 @@ import fs from 'fs'
 import ts from 'typescript'
 import { ConfigService } from '../services/config.service'
 import { PrismaService } from '../services/prisma.service'
+import { GeneratorHook } from '../types'
 
 export class BusHandler {
   constructor(
@@ -53,12 +54,6 @@ export class BusHandler {
       // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
 
-      console.log(
-        Object.values(events)
-          .map((e) => e.toString())
-          .join('; ')
-      )
-
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(this.sourceFiles[0], [
@@ -74,7 +69,7 @@ export class BusHandler {
                   ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
                   ts.factory.createObjectLiteralExpression(
                     Object.entries(events).map(([eventName, event]) => {
-                      const { model, method } = this.destructureEventName(event.toString())
+                      const { model, method, hook } = this.destructureEventName(event.toString())
                       return ts.factory.createPropertyAssignment(
                         ts.factory.createStringLiteral(eventName),
                         ts.factory.createArrowFunction(
@@ -110,7 +105,19 @@ export class BusHandler {
                               ts.factory.createTypeReferenceNode('PrismaClient')
                             ),
                           ],
-                          undefined,
+                          hook === GeneratorHook.before
+                            ? ts.factory.createUnionTypeNode([
+                                ts.factory.createIndexedAccessTypeNode(
+                                  /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                                    /* typeName */ ts.factory.createTypeReferenceNode(
+                                      `typeof prisma.${model.toLowerCase()}.${method}`
+                                    ),
+                                  ]),
+                                  /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                                ),
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+                              ])
+                            : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
                           undefined,
                           ts.factory.createBlock([])
                         )
