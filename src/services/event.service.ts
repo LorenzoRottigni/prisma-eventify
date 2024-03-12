@@ -6,10 +6,8 @@ export class EventService {
 
   public composeEventIdentifiers(
     { model, field, hook, method }: EventConstituents,
-    camelCase = `${model.toLowerCase()}${field ? `.${field}` : ''}${hook ? `.${hook}` : ''}${
-      method ? `.${method}` : ''
-    }`,
-    dotCase = `${capitalize(model)}${field ? capitalize(field) : ''}${hook ? capitalize(hook) : ''}${
+    dotCase = `${model.toLowerCase()}${field ? `.${field}` : ''}${hook ? `.${hook}` : ''}${method ? `.${method}` : ''}`,
+    camelCase = `${capitalize(model)}${field ? capitalize(field) : ''}${hook ? capitalize(hook) : ''}${
       method ? capitalize(method) : ''
     }`
   ): EventIdentifiers {
