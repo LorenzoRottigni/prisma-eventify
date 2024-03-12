@@ -6,6 +6,8 @@ import fs from 'fs'
 import { PrismaService } from '../src/services/prisma.service'
 import { ConfigService } from '../src/services/config.service'
 import { EventGenerator } from '../src/generators/event.generator'
+import { UserService } from '../codegen/user.service'
+import { BusHandler } from '../src/handlers/bus.handler'
 
 describe('Model Services Generator', () => {
   it('Should generate services bundle.', async () => {
@@ -25,6 +27,24 @@ describe('Model Services Generator', () => {
     const configService = new ConfigService(config)
     const generator = new EventGenerator(prismaService, configService)
     expect(generator.generateBundle()).toBe(true)
+  })
+
+  it('Should create a new user.', async () => {
+    const schema = await getDMMF({ datamodel })
+    const prismaService = new PrismaService(schema)
+    const busHandler = new BusHandler(prismaService)
+    const userService = new UserService(undefined, busHandler)
+
+    const user = userService.create({
+      data: {
+        email: 'lorenzo@rottigni.net',
+        password: 'password',
+        username: 'lorenzorottigni',
+        createdAt: new Date(),
+      },
+    })
+
+    expect(user).toBeTruthy()
   })
 
   // it('Should generate configuration bundle.', async () => {
