@@ -104,7 +104,7 @@ export default class ServiceGenerator {
                     ts.factory.createIdentifier('this.prisma'),
                     ts.factory.createIdentifier(modelName.toLowerCase())
                   ),
-                  ts.factory.createIdentifier(`${methodName}<typeof args>`)
+                  ts.factory.createIdentifier(methodName)
                 ),
                 /* typeArgs */ undefined,
                 /* args */ [ts.factory.createIdentifier('args')]

@@ -119,7 +119,7 @@ export class BusHandler {
                               ])
                             : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
                           undefined,
-                          ts.factory.createBlock([])
+                          ts.factory.createBlock([ts.factory.createReturnStatement()])
                         )
                       )
                     }),
