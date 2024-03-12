@@ -133,21 +133,53 @@ export default class ServiceGenerator {
               ]
             )
           ),
-          ts.factory.createReturnStatement(
-            ts.factory.createAwaitExpression(
-              ts.factory.createCallExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createPropertyAccessExpression(
-                    ts.factory.createIdentifier('this.prisma'),
-                    ts.factory.createIdentifier(modelName.toLowerCase())
-                  ),
-                  ts.factory.createIdentifier(methodName)
-                ),
+          ts.factory.createVariableStatement(
+            [],
+            [
+              ts.factory.createVariableDeclaration(
+                ts.factory.createIdentifier('result'),
                 undefined,
-                [ts.factory.createIdentifier('args')]
-              )
+                undefined, // Explicitly set type to undefined
+                ts.factory.createAwaitExpression(
+                  ts.factory.createCallExpression(
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('this.prisma'),
+                        ts.factory.createIdentifier(modelName.toLowerCase())
+                      ),
+                      ts.factory.createIdentifier(methodName)
+                    ),
+                    undefined,
+                    [ts.factory.createIdentifier('args')]
+                  )
+                )
+              ),
+            ]
+          ),
+          ts.factory.createExpressionStatement(
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('this.busHandler'),
+                ts.factory.createIdentifier('publishEvent')
+              ),
+              undefined,
+              [
+                ts.factory.createStringLiteral('UserAfterFindMany'),
+                ts.factory.createObjectLiteralExpression([
+                  ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
+                  ts.factory.createPropertyAssignment(
+                    'prisma',
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createIdentifier('this'),
+                      ts.factory.createIdentifier('prisma')
+                    )
+                  ),
+                  ts.factory.createPropertyAssignment('result', ts.factory.createIdentifier('result')),
+                ]),
+              ]
             )
           ),
+          ts.factory.createReturnStatement(ts.factory.createIdentifier('result')),
         ],
         /* multiline */ true
       )
