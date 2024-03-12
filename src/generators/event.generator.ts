@@ -1,6 +1,7 @@
 import { PrismaService } from '../services/prisma.service'
 import { ConfigService } from '../services/config.service'
 import { EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
+import * as events from './../../codegen/events'
 import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
@@ -9,7 +10,11 @@ export class EventGenerator implements EventifyGenerator {
   constructor(
     private prismaService: PrismaService,
     private configService: ConfigService,
-    private sourceFile: ts.SourceFile = createSourceFile('events.ts')
+    private sourceFiles: ts.SourceFile[] = [
+      createSourceFile('events.ts'),
+      createSourceFile('config.events.ts'),
+      createSourceFile('config.events.d.ts'),
+    ]
   ) {}
 
   /**
@@ -122,17 +127,212 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
+  private destructureEventName(event: string): { model: string; field?: string; hook?: string; method?: string } {
+    const chunks = event.split('.')
+    return chunks.length <= 3
+      ? {
+          model: chunks[0],
+          hook: chunks?.[1],
+          method: chunks?.[2],
+        }
+      : {
+          model: chunks[0],
+          field: chunks?.[1],
+          hook: chunks?.[2],
+          method: chunks?.[3],
+        }
+  }
+
+  private get eventTypeImport(): ts.ImportDeclaration {
+    return ts.factory.createImportDeclaration(
+      /* modifiers */ undefined,
+      ts.factory.createImportClause(
+        /* isTypeOnly */ true,
+        /* name (default import) */ undefined,
+        ts.factory.createNamedImports([
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('EventsConfig')),
+        ])
+      ),
+      ts.factory.createStringLiteral(this.configService.buildPath('config.events.d.ts'))
+    )
+  }
+
+  public generateEventsConfiguration(): boolean {
+    try {
+      // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
+      const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+
+      const file = printer.printNode(
+        ts.EmitHint.SourceFile,
+        ts.factory.updateSourceFile(this.sourceFiles[0], [
+          this.eventTypeImport,
+          this.prismaService.prismaClientImport(true),
+          ts.factory.createVariableStatement(
+            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            ts.factory.createVariableDeclarationList(
+              [
+                ts.factory.createVariableDeclaration(
+                  ts.factory.createIdentifier('config'),
+                  undefined,
+                  ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
+                  ts.factory.createObjectLiteralExpression(
+                    Object.entries(events).map(([eventName, event]) => {
+                      const { model, method, hook } = this.destructureEventName(event.toString())
+                      return ts.factory.createPropertyAssignment(
+                        ts.factory.createStringLiteral(eventName),
+                        ts.factory.createArrowFunction(
+                          undefined,
+                          undefined,
+                          [
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'args',
+                              undefined,
+                              ts.factory.createIndexedAccessTypeNode(
+                                /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                                  /* typeName */ ts.factory.createTypeReferenceNode(
+                                    `typeof prisma.${model.toLowerCase()}.${method}`
+                                  ),
+                                ]),
+                                /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                              )
+                            ),
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'ctx',
+                              undefined,
+                              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                            ),
+                            ts.factory.createParameterDeclaration(
+                              undefined,
+                              undefined,
+                              'prisma',
+                              undefined,
+                              ts.factory.createTypeReferenceNode('PrismaClient')
+                            ),
+                          ],
+                          hook === GeneratorHook.before
+                            ? ts.factory.createUnionTypeNode([
+                                ts.factory.createIndexedAccessTypeNode(
+                                  /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                                    /* typeName */ ts.factory.createTypeReferenceNode(
+                                      `typeof prisma.${model.toLowerCase()}.${method}`
+                                    ),
+                                  ]),
+                                  /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                                ),
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+                              ])
+                            : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+                          undefined,
+                          ts.factory.createBlock([ts.factory.createReturnStatement()])
+                        )
+                      )
+                    }),
+                    true
+                  )
+                ),
+              ],
+              ts.NodeFlags.Const
+            )
+          ),
+          ts.factory.createExportDefault(ts.factory.createIdentifier('config')),
+        ]),
+        this.sourceFiles[0]
+      )
+
+      fs.writeFileSync(this.sourceFiles[0].fileName, file)
+      return true
+    } catch (err) {
+      console.error(err)
+      return false
+    }
+  }
+
+  public generateEventsConfigurationTypes(): boolean {
+    try {
+      const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+
+      const file = printer.printNode(
+        ts.EmitHint.SourceFile,
+        ts.factory.updateSourceFile(this.sourceFiles[1], [
+          this.prismaService.prismaClientImport(true),
+          ts.factory.createInterfaceDeclaration(
+            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            ts.factory.createIdentifier('EventsConfig'),
+            undefined,
+            undefined,
+            Object.entries(events).map(([eventName, event]) => {
+              const { model, method } = this.destructureEventName(event.toString())
+              return ts.factory.createPropertySignature(
+                undefined,
+                ts.factory.createStringLiteral(eventName),
+                undefined,
+                ts.factory.createUnionTypeNode([
+                  ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
+                  ts.factory.createFunctionTypeNode(
+                    [],
+                    [
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'args',
+                        undefined,
+                        ts.factory.createIndexedAccessTypeNode(
+                          /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                            /* typeName */ ts.factory.createTypeReferenceNode(
+                              `typeof prisma.${model.toLowerCase()}.${method}`
+                            ),
+                          ]),
+                          /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+                        )
+                      ),
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'ctx',
+                        undefined,
+                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                      ),
+                      ts.factory.createParameterDeclaration(
+                        undefined,
+                        undefined,
+                        'prisma',
+                        undefined,
+                        ts.factory.createTypeReferenceNode('PrismaClient')
+                      ),
+                    ],
+                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword) // Return type is void
+                  ),
+                ])
+              )
+            })
+          ),
+        ]),
+        this.sourceFiles[1]
+      )
+
+      fs.writeFileSync(this.configService.buildPath(this.sourceFiles[1].fileName), file)
+      return true
+    } catch (err) {
+      console.error(err)
+      return false
+    }
+  }
+
   /**
    * @description Generates events bundle.
    * @returns {boolean} Generation status.
    */
-  public generateBundle(): boolean {
+  public generateEventsBundle(): boolean {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
-      const filename = this.configService.buildPath(this.sourceFile.fileName)
+      const filename = this.configService.buildPath(this.sourceFiles[0].fileName)
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
-        ts.factory.updateSourceFile(this.sourceFile, [
+        ts.factory.updateSourceFile(this.sourceFiles[0], [
           this.createEventDefinitionImport,
           ...this.prismaService.models
             .map(({ fields, name: modelName }) =>
@@ -159,7 +359,7 @@ export class EventGenerator implements EventifyGenerator {
             )
             .flat(4),
         ]),
-        this.sourceFile
+        this.sourceFiles[0]
       )
       fs.writeFileSync(filename, file)
       return true
@@ -167,5 +367,9 @@ export class EventGenerator implements EventifyGenerator {
       console.error(err)
       return false
     }
+  }
+
+  public generateBundle(): boolean {
+    return ![this.generateEventsBundle()].includes(false)
   }
 }
