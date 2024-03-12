@@ -25,6 +25,20 @@ export default class ServiceGenerator {
     })
   }
 
+  private get busHandlerImport() {
+    return ts.factory.createImportDeclaration(
+      /* modifiers */ undefined,
+      ts.factory.createImportClause(
+        /* isTypeOnly */ false,
+        /* name (default import) */ undefined,
+        ts.factory.createNamedImports([
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
+        ])
+      ),
+      ts.factory.createStringLiteral('./../src/handlers/bus.handler.ts')
+    )
+  }
+
   /**
    * @description For each source file loaded in the class generates its service class <model>.service.ts
    * @returns {boolean} Generation status.
@@ -39,6 +53,7 @@ export default class ServiceGenerator {
           ts.EmitHint.SourceFile,
           ts.factory.updateSourceFile(sourceFile, [
             this.prismaService.prismaClientImport(),
+            this.busHandlerImport,
             this.prismaService.generatePrismaClientModelsImport([sourceFile.model]),
             this.generateModelServiceClass(sourceFile.model),
           ]),
@@ -96,18 +111,40 @@ export default class ServiceGenerator {
       ]),
       /* body */ ts.factory.createBlock(
         [
-          /* return */ ts.factory.createReturnStatement(
-            /* await */ ts.factory.createAwaitExpression(
+          ts.factory.createExpressionStatement(
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('this.busHandler'),
+                ts.factory.createIdentifier('publishEvent')
+              ),
+              undefined,
+              [
+                ts.factory.createStringLiteral('UserBeforeFindMany'),
+                ts.factory.createObjectLiteralExpression([
+                  ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
+                  ts.factory.createPropertyAssignment(
+                    'prisma',
+                    ts.factory.createPropertyAccessExpression(
+                      ts.factory.createIdentifier('this'),
+                      ts.factory.createIdentifier('prisma')
+                    )
+                  ),
+                ]),
+              ]
+            )
+          ),
+          ts.factory.createReturnStatement(
+            ts.factory.createAwaitExpression(
               ts.factory.createCallExpression(
-                /* expression */ ts.factory.createPropertyAccessExpression(
+                ts.factory.createPropertyAccessExpression(
                   ts.factory.createPropertyAccessExpression(
                     ts.factory.createIdentifier('this.prisma'),
                     ts.factory.createIdentifier(modelName.toLowerCase())
                   ),
                   ts.factory.createIdentifier(methodName)
                 ),
-                /* typeArgs */ undefined,
-                /* args */ [ts.factory.createIdentifier('args')]
+                undefined,
+                [ts.factory.createIdentifier('args')]
               )
             )
           ),
@@ -174,6 +211,14 @@ export default class ServiceGenerator {
             undefined, // Type arguments (optional)
             [] // Empty arguments array
           )
+        ),
+        ts.factory.createParameterDeclaration(
+          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
+          undefined,
+          ts.factory.createIdentifier('busHandler'),
+          undefined,
+          undefined,
+          ts.factory.createNewExpression(ts.factory.createIdentifier('BusHandler'), undefined, [])
         ),
       ],
       ts.factory.createBlock(
