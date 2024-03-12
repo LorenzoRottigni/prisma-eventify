@@ -124,7 +124,7 @@ export class EventGenerator implements EventifyGenerator {
   public generateConfigEntry(
     constituents: EventConstituents,
     { camelCase } = this.eventService.composeEventIdentifiers(constituents)
-  ) {
+  ): ts.PropertyAssignment {
     return ts.factory.createPropertyAssignment(
       ts.factory.createStringLiteral(camelCase),
       ts.factory.createArrowFunction(
@@ -174,7 +174,19 @@ export class EventGenerator implements EventifyGenerator {
             ])
           : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
         undefined,
-        ts.factory.createBlock([ts.factory.createReturnStatement()])
+        ts.factory.createBlock([
+          ts.factory.createExpressionStatement(
+            ts.factory.createCallExpression(
+              ts.factory.createPropertyAccessExpression(
+                ts.factory.createIdentifier('console'),
+                ts.factory.createIdentifier('log')
+              ),
+              undefined,
+              [ts.factory.createStringLiteral(`Dispatched event: ${camelCase}`)]
+            )
+          ),
+          // ts.factory.createReturnStatement(),
+        ])
       )
     )
   }
@@ -241,14 +253,14 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
-  public generateEventsConfiguration(): boolean {
+  public generateEventsConfiguration(sourceFile: ts.SourceFile): boolean {
     try {
       // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
-        ts.factory.updateSourceFile(this.sourceFiles[0], [
+        ts.factory.updateSourceFile(sourceFile, [
           this.eventTypeImport,
           this.prismaService.prismaClientImport(true),
           ts.factory.createVariableStatement(
@@ -297,10 +309,10 @@ export class EventGenerator implements EventifyGenerator {
           ),
           ts.factory.createExportDefault(ts.factory.createIdentifier('config')),
         ]),
-        this.sourceFiles[0]
+        sourceFile
       )
 
-      fs.writeFileSync(this.sourceFiles[0].fileName, file)
+      fs.writeFileSync(sourceFile.fileName, file)
       return true
     } catch (err) {
       console.error(err)
@@ -308,13 +320,13 @@ export class EventGenerator implements EventifyGenerator {
     }
   }
 
-  public generateEventsConfigurationTypes(): boolean {
+  public generateEventsConfigurationTypes(sourceFile: ts.SourceFile): boolean {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
-        ts.factory.updateSourceFile(this.sourceFiles[1], [
+        ts.factory.updateSourceFile(sourceFile, [
           this.prismaService.prismaClientImport(true),
           ts.factory.createInterfaceDeclaration(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -351,10 +363,10 @@ export class EventGenerator implements EventifyGenerator {
               .flat(4)
           ),
         ]),
-        this.sourceFiles[1]
+        sourceFile
       )
 
-      fs.writeFileSync(this.configService.buildPath(this.sourceFiles[1].fileName), file)
+      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
@@ -366,13 +378,12 @@ export class EventGenerator implements EventifyGenerator {
    * @description Generates events bundle.
    * @returns {boolean} Generation status.
    */
-  public generateEventsBundle(): boolean {
+  public generateEventsBundle(sourceFile: ts.SourceFile): boolean {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
-      const filename = this.configService.buildPath(this.sourceFiles[0].fileName)
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
-        ts.factory.updateSourceFile(this.sourceFiles[0], [
+        ts.factory.updateSourceFile(sourceFile, [
           this.createEventDefinitionImport,
           ...this.prismaService.models
             .map(({ fields, name: model }) =>
@@ -403,9 +414,9 @@ export class EventGenerator implements EventifyGenerator {
             )
             .flat(4),
         ]),
-        this.sourceFiles[0]
+        sourceFile
       )
-      fs.writeFileSync(filename, file)
+      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
@@ -414,6 +425,10 @@ export class EventGenerator implements EventifyGenerator {
   }
 
   public generateBundle(): boolean {
-    return ![this.generateEventsBundle()].includes(false)
+    return ![
+      this.generateEventsBundle(this.sourceFiles[0]),
+      this.generateEventsConfiguration(this.sourceFiles[1]),
+      this.generateEventsConfigurationTypes(this.sourceFiles[2]),
+    ].includes(false)
   }
 }

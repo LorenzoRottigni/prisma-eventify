@@ -1,4 +1,4 @@
-import { EventConstituents, EventIdentifiers } from '../types'
+import { EventConstituents, EventIdentifiers, GeneratorHook, PrismaAPI } from '../types'
 import { capitalize } from '../utils'
 
 export class EventService {
@@ -24,14 +24,14 @@ export class EventService {
     return chunks.length <= 4
       ? {
           model: chunks[0],
-          hook: chunks?.[1],
-          method: chunks?.[2],
+          hook: chunks?.[1] as GeneratorHook,
+          method: chunks?.[2] as PrismaAPI,
         }
       : {
           model: chunks[0],
           field: chunks?.[1],
-          hook: chunks?.[2],
-          method: chunks?.[3],
+          hook: chunks?.[2] as GeneratorHook,
+          method: chunks?.[3] as PrismaAPI,
         }
   }
 }

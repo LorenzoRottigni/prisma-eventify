@@ -27,6 +27,6 @@ export declare interface EventIdentifiers {
 export declare interface EventConstituents {
   model: string
   field?: string
-  hook?: string
-  method?: string
+  hook?: GeneratorHook
+  method?: PrismaAPI
 }
