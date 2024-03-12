@@ -1,15 +1,16 @@
 import { PrismaService } from '../services/prisma.service'
 import { ConfigService } from '../services/config.service'
-import { EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
-import * as events from './../../codegen/events'
+import { EventConstituents, EventIdentifiers, EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
 import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
+import { EventService } from '../services/event.service'
 
 export class EventGenerator implements EventifyGenerator {
   constructor(
     private prismaService: PrismaService,
     private configService: ConfigService,
+    private eventService = new EventService(),
     private sourceFiles: ts.SourceFile[] = [
       createSourceFile('events.ts'),
       createSourceFile('config.events.ts'),
@@ -47,15 +48,12 @@ export class EventGenerator implements EventifyGenerator {
    * @param {string} exportName
    * @returns {ts.VariableStatement}
    */
-  public generateEventDefinition(
-    modelName: string,
-    fieldName: string | undefined,
-    hook: GeneratorHook | undefined,
-    method: PrismaAPI | undefined,
-    eventName = `${modelName.toLowerCase()}${fieldName ? `.${fieldName}` : ''}${hook ? `.${hook}` : ''}${
+  public generateEvent(
+    { model, field, hook, method }: EventConstituents,
+    eventName = `${model.toLowerCase()}${field ? `.${field}` : ''}${hook ? `.${hook}` : ''}${
       method ? `.${method}` : ''
     }`,
-    exportName = `${capitalize(modelName)}${fieldName ? capitalize(fieldName) : ''}${hook ? capitalize(hook) : ''}${
+    exportName = `${capitalize(model)}${field ? capitalize(field) : ''}${hook ? capitalize(hook) : ''}${
       method ? capitalize(method) : ''
     }`
   ): ts.VariableStatement {
@@ -66,9 +64,7 @@ export class EventGenerator implements EventifyGenerator {
         undefined,
         /* type */ ts.factory.createIndexedAccessTypeNode(
           /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
-            /* typeName */ ts.factory.createTypeReferenceNode(
-              `typeof this.prisma.${modelName.toLowerCase()}.${method}`
-            ),
+            /* typeName */ ts.factory.createTypeReferenceNode(`typeof this.prisma.${model.toLowerCase()}.${method}`),
           ]),
           /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
         )
@@ -95,9 +91,7 @@ export class EventGenerator implements EventifyGenerator {
           undefined,
           /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
             ts.factory.createTypeReferenceNode('ReturnType', [
-              /* typeName */ ts.factory.createTypeReferenceNode(
-                `typeof this.prisma.${modelName.toLowerCase()}.${method}`
-              ),
+              /* typeName */ ts.factory.createTypeReferenceNode(`typeof this.prisma.${model.toLowerCase()}.${method}`),
             ]),
           ])
         )
@@ -127,20 +121,110 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
-  private destructureEventName(event: string): { model: string; field?: string; hook?: string; method?: string } {
-    const chunks = event.split('.')
-    return chunks.length <= 3
-      ? {
-          model: chunks[0],
-          hook: chunks?.[1],
-          method: chunks?.[2],
-        }
-      : {
-          model: chunks[0],
-          field: chunks?.[1],
-          hook: chunks?.[2],
-          method: chunks?.[3],
-        }
+  public generateConfigEntry(
+    constituents: EventConstituents,
+    { camelCase } = this.eventService.composeEventIdentifiers(constituents)
+  ) {
+    return ts.factory.createPropertyAssignment(
+      ts.factory.createStringLiteral(camelCase),
+      ts.factory.createArrowFunction(
+        undefined,
+        undefined,
+        [
+          ts.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            'args',
+            undefined,
+            ts.factory.createIndexedAccessTypeNode(
+              /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                /* typeName */ ts.factory.createTypeReferenceNode(
+                  `typeof prisma.${constituents.model.toLowerCase()}.${constituents.method}`
+                ),
+              ]),
+              /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+            )
+          ),
+          ts.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            'ctx',
+            undefined,
+            ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+          ),
+          ts.factory.createParameterDeclaration(
+            undefined,
+            undefined,
+            'prisma',
+            undefined,
+            ts.factory.createTypeReferenceNode('PrismaClient')
+          ),
+        ],
+        constituents.hook === GeneratorHook.before
+          ? ts.factory.createUnionTypeNode([
+              ts.factory.createIndexedAccessTypeNode(
+                /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                  /* typeName */ ts.factory.createTypeReferenceNode(
+                    `typeof prisma.${constituents.model.toLowerCase()}.${constituents.method}`
+                  ),
+                ]),
+                /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+              ),
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+            ])
+          : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
+        undefined,
+        ts.factory.createBlock([ts.factory.createReturnStatement()])
+      )
+    )
+  }
+
+  public generateConfigEntryType(
+    constituents: EventConstituents,
+    { camelCase } = this.eventService.composeEventIdentifiers(constituents)
+  ) {
+    return ts.factory.createPropertySignature(
+      undefined,
+      ts.factory.createStringLiteral(camelCase),
+      undefined,
+      ts.factory.createUnionTypeNode([
+        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
+        ts.factory.createFunctionTypeNode(
+          [],
+          [
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              'args',
+              undefined,
+              ts.factory.createIndexedAccessTypeNode(
+                /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
+                  /* typeName */ ts.factory.createTypeReferenceNode(
+                    `typeof prisma.${constituents.model.toLowerCase()}.${constituents.method}`
+                  ),
+                ]),
+                /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+              )
+            ),
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              'ctx',
+              undefined,
+              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+            ),
+            ts.factory.createParameterDeclaration(
+              undefined,
+              undefined,
+              'prisma',
+              undefined,
+              ts.factory.createTypeReferenceNode('PrismaClient')
+            ),
+          ],
+          ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword) // Return type is void
+        ),
+      ])
+    )
   }
 
   private get eventTypeImport(): ts.ImportDeclaration {
@@ -176,61 +260,34 @@ export class EventGenerator implements EventifyGenerator {
                   undefined,
                   ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('EventsConfig')),
                   ts.factory.createObjectLiteralExpression(
-                    Object.entries(events).map(([eventName, event]) => {
-                      const { model, method, hook } = this.destructureEventName(event.toString())
-                      return ts.factory.createPropertyAssignment(
-                        ts.factory.createStringLiteral(eventName),
-                        ts.factory.createArrowFunction(
-                          undefined,
-                          undefined,
-                          [
-                            ts.factory.createParameterDeclaration(
-                              undefined,
-                              undefined,
-                              'args',
-                              undefined,
-                              ts.factory.createIndexedAccessTypeNode(
-                                /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
-                                  /* typeName */ ts.factory.createTypeReferenceNode(
-                                    `typeof prisma.${model.toLowerCase()}.${method}`
-                                  ),
-                                ]),
-                                /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
-                              )
-                            ),
-                            ts.factory.createParameterDeclaration(
-                              undefined,
-                              undefined,
-                              'ctx',
-                              undefined,
-                              ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
-                            ),
-                            ts.factory.createParameterDeclaration(
-                              undefined,
-                              undefined,
-                              'prisma',
-                              undefined,
-                              ts.factory.createTypeReferenceNode('PrismaClient')
-                            ),
-                          ],
-                          hook === GeneratorHook.before
-                            ? ts.factory.createUnionTypeNode([
-                                ts.factory.createIndexedAccessTypeNode(
-                                  /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
-                                    /* typeName */ ts.factory.createTypeReferenceNode(
-                                      `typeof prisma.${model.toLowerCase()}.${method}`
-                                    ),
-                                  ]),
-                                  /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
-                                ),
-                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
-                              ])
-                            : ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword),
-                          undefined,
-                          ts.factory.createBlock([ts.factory.createReturnStatement()])
-                        )
+                    this.prismaService.models
+                      .map(({ fields, name: model }) =>
+                        this.configService.modelAllowed(model)
+                          ? [
+                              /* Generates event names combining model, hook, method */
+                              ...Object.values(PrismaAPI).map((method) =>
+                                Object.values(GeneratorHook).map((hook) =>
+                                  this.generateConfigEntry({
+                                    model,
+                                    hook,
+                                    method,
+                                  })
+                                )
+                              ),
+                              /* Generates event names combining model, field, hook, method */
+                              ...fields.map(({ name: field }) =>
+                                this.configService.fieldAllowed(model, field)
+                                  ? [PrismaAPI.create, PrismaAPI.delete, PrismaAPI.update].map((method) =>
+                                      Object.values(GeneratorHook).map((hook) =>
+                                        this.generateConfigEntry({ model, field, hook, method })
+                                      )
+                                    )
+                                  : []
+                              ),
+                            ]
+                          : []
                       )
-                    }),
+                      .flat(4),
                     true
                   )
                 ),
@@ -264,51 +321,34 @@ export class EventGenerator implements EventifyGenerator {
             ts.factory.createIdentifier('EventsConfig'),
             undefined,
             undefined,
-            Object.entries(events).map(([eventName, event]) => {
-              const { model, method } = this.destructureEventName(event.toString())
-              return ts.factory.createPropertySignature(
-                undefined,
-                ts.factory.createStringLiteral(eventName),
-                undefined,
-                ts.factory.createUnionTypeNode([
-                  ts.factory.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-                  ts.factory.createFunctionTypeNode(
-                    [],
-                    [
-                      ts.factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        'args',
-                        undefined,
-                        ts.factory.createIndexedAccessTypeNode(
-                          /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
-                            /* typeName */ ts.factory.createTypeReferenceNode(
-                              `typeof prisma.${model.toLowerCase()}.${method}`
-                            ),
-                          ]),
-                          /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
+            this.prismaService.models
+              .map(({ fields, name: model }) =>
+                this.configService.modelAllowed(model)
+                  ? [
+                      /* Generates event names combining model, hook, method */
+                      ...Object.values(PrismaAPI).map((method) =>
+                        Object.values(GeneratorHook).map((hook) =>
+                          this.generateConfigEntryType({
+                            model,
+                            hook,
+                            method,
+                          })
                         )
                       ),
-                      ts.factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        'ctx',
-                        undefined,
-                        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+                      /* Generates event names combining model, field, hook, method */
+                      ...fields.map(({ name: field }) =>
+                        this.configService.fieldAllowed(model, field)
+                          ? [PrismaAPI.create, PrismaAPI.delete, PrismaAPI.update].map((method) =>
+                              Object.values(GeneratorHook).map((hook) =>
+                                this.generateConfigEntryType({ model, field, hook, method })
+                              )
+                            )
+                          : []
                       ),
-                      ts.factory.createParameterDeclaration(
-                        undefined,
-                        undefined,
-                        'prisma',
-                        undefined,
-                        ts.factory.createTypeReferenceNode('PrismaClient')
-                      ),
-                    ],
-                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.VoidKeyword) // Return type is void
-                  ),
-                ])
+                    ]
+                  : []
               )
-            })
+              .flat(4)
           ),
         ]),
         this.sourceFiles[1]
@@ -335,21 +375,25 @@ export class EventGenerator implements EventifyGenerator {
         ts.factory.updateSourceFile(this.sourceFiles[0], [
           this.createEventDefinitionImport,
           ...this.prismaService.models
-            .map(({ fields, name: modelName }) =>
-              this.configService.modelAllowed(modelName)
+            .map(({ fields, name: model }) =>
+              this.configService.modelAllowed(model)
                 ? [
                     /* Generates event names combining model, hook, method */
                     ...Object.values(PrismaAPI).map((method) =>
                       Object.values(GeneratorHook).map((hook) =>
-                        this.generateEventDefinition(modelName, undefined, hook, method)
+                        this.generateEvent({
+                          model,
+                          hook,
+                          method,
+                        })
                       )
                     ),
                     /* Generates event names combining model, field, hook, method */
-                    ...fields.map(({ name: fieldName }) =>
-                      this.configService.fieldAllowed(modelName, fieldName)
+                    ...fields.map(({ name: field }) =>
+                      this.configService.fieldAllowed(model, field)
                         ? [PrismaAPI.create, PrismaAPI.delete, PrismaAPI.update].map((method) =>
                             Object.values(GeneratorHook).map((hook) =>
-                              this.generateEventDefinition(modelName, fieldName, hook, method)
+                              this.generateEvent({ model, field, hook, method })
                             )
                           )
                         : []

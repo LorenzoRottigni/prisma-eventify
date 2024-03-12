@@ -18,3 +18,15 @@ export enum GeneratorHook {
   before = 'before',
   after = 'after',
 }
+
+export declare interface EventIdentifiers {
+  camelCase: string
+  dotCase: string
+}
+
+export declare interface EventConstituents {
+  model: string
+  field?: string
+  hook?: string
+  method?: string
+}
