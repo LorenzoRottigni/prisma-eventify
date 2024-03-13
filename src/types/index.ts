@@ -1,4 +1,5 @@
 import ts from 'typescript'
+import { Prisma } from '@prisma/client'
 
 export declare type EventifySourceFile = ts.SourceFile & { model: string }
 

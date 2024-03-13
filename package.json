@@ -2,6 +2,7 @@
   "name": "prisma-eventify",
   "scripts": {
     "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate",
     "type-check": "tsc",
     "build": "swc src --out-dir dist --extensions '.ts'",
     "test": "jest tests",

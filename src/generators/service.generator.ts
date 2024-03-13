@@ -34,7 +34,7 @@ export default class ServiceGenerator {
     return ts.factory.createImportDeclaration(
       /* modifiers */ undefined,
       ts.factory.createImportClause(
-        /* isTypeOnly */ false,
+        /* isTypeOnly */ true,
         /* name (default import) */ undefined,
         ts.factory.createNamedImports([
           ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
@@ -80,7 +80,7 @@ export default class ServiceGenerator {
    * @param {string} methodName Service method.
    * @returns {ts.MethodDeclaration}
    */
-  public generateModelMethod(model: string, method: string): ts.MethodDeclaration {
+  public generateModelMethod(model: string, method: PrismaAPI): ts.MethodDeclaration {
     return ts.factory.createMethodDeclaration(
       /* modifiers */ [
         ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
@@ -248,6 +248,13 @@ export default class ServiceGenerator {
       undefined,
       [
         ts.factory.createParameterDeclaration(
+          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
+          undefined,
+          ts.factory.createIdentifier('busHandler'),
+          undefined,
+          ts.factory.createTypeReferenceNode('BusHandler', [])
+        ),
+        ts.factory.createParameterDeclaration(
           [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)], // Modifier: private
           undefined,
           ts.factory.createIdentifier('prisma'), // Parameter name
@@ -258,14 +265,6 @@ export default class ServiceGenerator {
             undefined, // Type arguments (optional)
             [] // Empty arguments array
           )
-        ),
-        ts.factory.createParameterDeclaration(
-          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
-          undefined,
-          ts.factory.createIdentifier('busHandler'),
-          undefined,
-          undefined,
-          ts.factory.createNewExpression(ts.factory.createIdentifier('BusHandler'), undefined, [])
         ),
       ],
       ts.factory.createBlock(
@@ -332,7 +331,7 @@ export default class ServiceGenerator {
                             ts.factory.createIdentifier('this.prisma'),
                             ts.factory.createIdentifier(modelName.toLowerCase())
                           ),
-                          ts.factory.createIdentifier('findUnique')
+                          ts.factory.createIdentifier(PrismaAPI.findUnique)
                         ),
                         undefined,
                         [

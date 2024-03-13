@@ -32,12 +32,12 @@ describe('Model Services Generator', () => {
   it('Should create a new user.', async () => {
     const schema = await getDMMF({ datamodel })
     const prismaService = new PrismaService(schema)
-    const busHandler = new BusHandler(prismaService)
-    const userService = new UserService(undefined, busHandler)
-
-    const user = userService.create({
+    const configService = new ConfigService(config)
+    const busHandler = new BusHandler(prismaService, configService)
+    const userService = new UserService(busHandler)
+    const user = await userService.create({
       data: {
-        email: 'lorenzo@rottigni.net',
+        email: 'lorenzo@rottigni.tech',
         password: 'password',
         username: 'lorenzorottigni',
         createdAt: new Date(),
@@ -46,12 +46,4 @@ describe('Model Services Generator', () => {
 
     expect(user).toBeTruthy()
   })
-
-  // it('Should generate configuration bundle.', async () => {
-  //   const schema = await getDMMF({ datamodel })
-  //   const prismaService = new PrismaService(schema)
-  //   const configService = new ConfigService(config)
-  //   const busHandler = new BusHandler(prismaService, configService)
-  //   expect(busHandler.generateBundle()).toBeTruthy()
-  // })
 })
