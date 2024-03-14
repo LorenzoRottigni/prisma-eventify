@@ -65,7 +65,7 @@ export default class ServiceGenerator {
             ]),
             sourceFile
           )
-          await fs.promises.writeFile(path, file)
+          await fs.promises.writeFile(path, file, { flag: 'w' })
           return fs.existsSync(path)
         } catch (err) {
           console.error(err)
