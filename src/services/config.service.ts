@@ -3,14 +3,19 @@ import fs from 'fs'
 export class ConfigService {
   constructor(protected config: EventifyConfig) {}
 
-  public buildPath(filename: string, baseDir = '') {
-    if (!fs.existsSync(this.config.outDir)) {
-      fs.mkdirSync(this.config.outDir)
+  public async buildPath(filename: string, baseDir = '') {
+    try {
+      if (!fs.existsSync(this.config.outDir)) {
+        await fs.promises.mkdir(this.config.outDir)
+      }
+      if (!fs.existsSync(`${this.config.outDir}${baseDir}`)) {
+        await fs.promises.mkdir(`${this.config.outDir}${baseDir}`)
+      }
+      return `${this.config.outDir}${baseDir}/${filename}`
+    } catch (err) {
+      console.error(err)
+      return `${this.config.outDir}${baseDir}/${filename}`
     }
-    if (!fs.existsSync(`${this.config.outDir}${baseDir}`)) {
-      fs.mkdirSync(`${this.config.outDir}${baseDir}`)
-    }
-    return `${this.config.outDir}${baseDir}/${filename}`
   }
 
   public modelAllowed(model: string): boolean {
