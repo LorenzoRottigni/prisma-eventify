@@ -1,5 +1,4 @@
 import { EventBus } from 'ts-bus'
-import config from './../../eventify.config'
 import { EventService } from '../services/eventify.service'
 import { PrismaService } from './../services/prisma.service'
 import { PrismaAPI } from '../types'
@@ -10,6 +9,7 @@ import { EventifyConfig } from '../types/config'
 
 export class BusHandler {
   private events = {}
+  private config: any
   constructor(
     config: EventifyConfig,
     schema = Prisma.dmmf as DMMF.Document,
@@ -24,8 +24,9 @@ export class BusHandler {
   public async subscribeConfigEvents() {
     // @ts-expect-error WIP
     this.events = await import('./../../dist/bundle/events')
+    this.config = await import('./../../eventify.config')
 
-    Object.entries(config).forEach(([event, callback]) => {
+    Object.entries(this.config).forEach(([event, callback]) => {
       // @ts-expect-error WIP
       this.bus.subscribe(this.events[event], callback)
     })
