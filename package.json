@@ -29,7 +29,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate",
     "type-check": "tsc",
-    "build": "swc src/**/* --out-dir dist --extensions '.ts'",
+    "build": "swc src --out-dir dist --extensions '.ts'",
     "test": "jest tests",
     "lint": "eslint --ext .ts \"src/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix"
