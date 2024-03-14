@@ -8,12 +8,12 @@ import { EventifyConfig } from '../src/types/config'
 import { Prisma } from '@prisma/client'
 import { DMMF } from '@prisma/generator-helper'
 import { BusHandler } from '../src/handlers/bus.handler'
-import { UserService } from './../dist/bundle/services/user.service'
+import { UserService } from './../eventify/services/user.service'
 
 const config: EventifyConfig = {
   excludeFields: ['id'],
   excludeModels: [],
-  outDir: './dist/bundle',
+  outDir: './eventify',
 }
 
 describe('Model Services Generator', () => {
@@ -39,7 +39,7 @@ describe('Model Services Generator', () => {
     const userService = new UserService(busHandler)
     const user = await userService.create({
       data: {
-        email: 'lorenzo@rottigni.zh',
+        email: `${new Date().getTime()}.lorenzo@rottigni.net`,
         password: 'password',
         username: 'lorenzorottigni',
         createdAt: new Date(),

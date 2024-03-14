@@ -1,4 +1,4 @@
 node_modules/
-codegen/
+eventify/
 dist/
 eventify.config.*

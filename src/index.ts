@@ -27,13 +27,13 @@ export async function loadEventBus(config: EventifyConfig): Promise<BusHandler> 
 generatorHandler({
   onManifest() {
     return {
-      defaultOutput: './dist/bundle',
+      defaultOutput: './eventify',
       prettyName: 'Prisma Eventify',
     }
   },
   async onGenerate({ datamodel, generator }: GeneratorOptions) {
     const config: EventifyConfig = {
-      outDir: typeof generator.config?.outDir === 'string' ? typeof generator.config?.outDir : './dist/bundle',
+      outDir: typeof generator.config?.outDir === 'string' ? typeof generator.config?.outDir : './eventify',
       excludeFields: Array.isArray(generator.config?.excludeFields)
         ? generator.config.excludeFields
         : typeof generator.config?.excludeFields === 'string'

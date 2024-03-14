@@ -23,7 +23,7 @@ export class BusHandler {
 
   public async subscribeConfigEvents() {
     // @ts-expect-error WIP
-    this.events = await import('./../../dist/bundle/events')
+    this.events = await import('./../../eventify/events')
     this.config = await import('./../../eventify.config')
 
     Object.entries(this.config).forEach(([event, callback]) => {
