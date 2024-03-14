@@ -4,9 +4,9 @@
   "author": "LorenzoRottigni <lorenzo@rottigni.net>",
   "repository": "git@github.com:LorenzoRottigni/prisma-eventify.git",
   "homepage": "https://github.com/LorenzoRottigni/prisma-eventify",
-  "version": "0.0.1-alpha",
+  "version": "0.0.1-alpha.d8b39d0",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "files": [
     "dist"
   ],
@@ -26,7 +26,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate",
     "type-check": "tsc",
-    "build": "swc src --out-dir dist --extensions '.ts'",
+    "build": "swc src/**/* --out-dir dist --extensions '.ts'",
     "test": "jest tests",
     "lint": "eslint --ext .ts \"src/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix"
