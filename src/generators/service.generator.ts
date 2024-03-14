@@ -40,7 +40,9 @@ export default class ServiceGenerator {
           ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
         ])
       ),
-      ts.factory.createStringLiteral('./../../src/handlers/bus.handler')
+      ts.factory.createStringLiteral(
+        process.env.NODE_ENV === 'develop' ? './../../src/handlers/bus.handler' : 'prisma-eventify'
+      )
     )
   }
 
