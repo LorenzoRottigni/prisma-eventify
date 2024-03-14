@@ -18,9 +18,9 @@ export async function generate(datamodel: string, config: EventifyConfig): Promi
   return !(await Promise.all(generators.map(async (generator) => await generator.generateBundle()))).includes(false)
 }
 
-export function loadEventBus(config: EventifyConfig) {
+export async function loadEventBus(config: EventifyConfig): Promise<BusHandler> {
   const busHandler = new BusHandler(config)
-  busHandler.subscribeConfigEvents()
+  await busHandler.subscribeConfigEvents()
   return busHandler
 }
 

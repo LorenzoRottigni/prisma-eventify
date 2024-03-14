@@ -1,5 +1,4 @@
 import { EventBus } from 'ts-bus'
-import * as events from './../../dist/bundle/events'
 import config from './../../eventify.config'
 import { EventService } from '../services/eventify.service'
 import { PrismaService } from './../services/prisma.service'
@@ -10,6 +9,7 @@ import { DMMF } from '@prisma/generator-helper'
 import { EventifyConfig } from '../types/config'
 
 export class BusHandler {
+  private events = {}
   constructor(
     config: EventifyConfig,
     schema = Prisma.dmmf as DMMF.Document,
@@ -21,16 +21,20 @@ export class BusHandler {
     this.subscribeConfigEvents()
   }
 
-  public subscribeConfigEvents() {
+  public async subscribeConfigEvents() {
+    // @ts-expect-error WIP
+    this.events = await import('./../../dist/bundle/events')
+
     Object.entries(config).forEach(([event, callback]) => {
-      this.bus.subscribe(events[event], callback)
+      // @ts-expect-error WIP
+      this.bus.subscribe(this.events[event], callback)
     })
   }
 
   public publishEvent(event: string, meta: { prisma: PrismaClient; [x: string]: any }) {
-    if (!events?.[event]?.eventType) return false
+    if (!this.events?.[event]?.eventType) return false
     const { model, field, hook, method } = this.eventService.destructureEventIdentifiers({
-      dotCase: events[event].eventType,
+      dotCase: this.events[event].eventType,
     })
     if (!this.configService.modelAllowed(model)) return
     if (model && !field && method && [PrismaAPI.create, PrismaAPI.update, PrismaAPI.delete].includes(method)) {
@@ -45,11 +49,11 @@ export class BusHandler {
           method,
         }).camelCase
 
-        if (events[fieldEvent]) this.bus.publish(events[fieldEvent](), meta)
+        if (this.events[fieldEvent]) this.bus.publish(this.events[fieldEvent](), meta)
       })
     }
 
-    this.bus.publish(events[event](), meta)
+    this.bus.publish(this.events[event](), meta)
     return true
   }
 }
