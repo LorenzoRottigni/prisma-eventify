@@ -6,10 +6,18 @@ export class ConfigService {
   public async buildPath(filename: string, baseDir = '') {
     try {
       if (!fs.existsSync(this.config.outDir)) {
-        await fs.promises.mkdir(this.config.outDir)
+        try {
+          await fs.promises.mkdir(this.config.outDir)
+        } catch (err) {
+          console.error(err)
+        }
       }
       if (!fs.existsSync(`${this.config.outDir}${baseDir}`)) {
-        await fs.promises.mkdir(`${this.config.outDir}${baseDir}`)
+        try {
+          await fs.promises.mkdir(`${this.config.outDir}${baseDir}`)
+        } catch (err) {
+          console.error(err)
+        }
       }
       return `${this.config.outDir}${baseDir}/${filename}`
     } catch (err) {
