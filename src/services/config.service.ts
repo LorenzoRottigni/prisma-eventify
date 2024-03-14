@@ -14,7 +14,9 @@ export class ConfigService {
       }
       if (!fs.existsSync(`${this.config.outDir}${baseDir}`)) {
         try {
-          await fs.promises.mkdir(`${this.config.outDir}${baseDir}`)
+          await fs.promises.mkdir(`${this.config.outDir}${baseDir}`, {
+            recursive: true,
+          })
         } catch (err) {
           console.error(err)
         }
