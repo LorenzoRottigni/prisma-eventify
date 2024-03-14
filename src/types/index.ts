@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client'
 export declare type EventifySourceFile = ts.SourceFile & { model: string }
 
 export declare interface EventifyGenerator {
-  generateBundle(): boolean
+  generateBundle(): Promise<boolean>
 }
 
 export enum EventifyFile {

@@ -23,7 +23,7 @@ describe('Model Services Generator', () => {
     const prismaService = new PrismaService(schema)
     const configService = new ConfigService(config)
     const generator = new ServiceGenerator(prismaService, configService)
-    expect(generator.generateBundle()).toBe(true)
+    expect(await generator.generateBundle()).toBe(true)
   })
 
   it('Should generate events bundle.', async () => {
@@ -31,7 +31,7 @@ describe('Model Services Generator', () => {
     const prismaService = new PrismaService(schema)
     const configService = new ConfigService(config)
     const generator = new EventGenerator(prismaService, configService)
-    expect(generator.generateBundle()).toBe(true)
+    expect(await generator.generateBundle()).toBe(true)
   })
 
   it('Should create a new user.', async () => {

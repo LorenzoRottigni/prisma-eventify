@@ -48,29 +48,31 @@ export default class ServiceGenerator {
    * @description For each source file loaded in the class generates its service class <model>.service.ts
    * @returns {boolean} Generation status.
    */
-  public generateBundle(): boolean {
+  public async generateBundle(): Promise<boolean> {
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
-    let status: boolean[] = []
-    this.sourceFiles.forEach((sourceFile) => {
-      try {
-        const path = this.configService.buildPath(sourceFile.fileName, '/services')
-        const file = printer.printNode(
-          ts.EmitHint.SourceFile,
-          ts.factory.updateSourceFile(sourceFile, [
-            this.prismaService.prismaClientImport(),
-            this.busHandlerImport,
-            this.prismaService.generatePrismaClientModelsImport([sourceFile.model]),
-            this.generateModelServiceClass(sourceFile.model),
-          ]),
-          sourceFile
-        )
-        fs.writeFileSync(path, file)
-        status.push(fs.existsSync(path))
-      } catch (err) {
-        console.error(err)
-        status.push(false)
-      }
-    })
+
+    const status: boolean[] = await Promise.all(
+      this.sourceFiles.map(async (sourceFile) => {
+        try {
+          const path = this.configService.buildPath(sourceFile.fileName, '/services')
+          const file = printer.printNode(
+            ts.EmitHint.SourceFile,
+            ts.factory.updateSourceFile(sourceFile, [
+              this.prismaService.prismaClientImport(),
+              this.busHandlerImport,
+              this.prismaService.generatePrismaClientModelsImport([sourceFile.model]),
+              this.generateModelServiceClass(sourceFile.model),
+            ]),
+            sourceFile
+          )
+          await fs.promises.writeFile(path, file)
+          return fs.existsSync(path)
+        } catch (err) {
+          console.error(err)
+          return false
+        }
+      })
+    )
     return !status.includes(false)
   }
 

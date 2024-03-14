@@ -15,7 +15,7 @@ export async function generate(datamodel: string, config: EventifyConfig): Promi
     new ServiceGenerator(prismaService, configService),
     new EventGenerator(prismaService, configService),
   ]
-  return !generators.map((generator) => generator.generateBundle()).includes(false)
+  return !(await Promise.all(generators.map(async (generator) => await generator.generateBundle()))).includes(false)
 }
 
 export function loadEventBus(config: EventifyConfig) {

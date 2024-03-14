@@ -261,7 +261,7 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
-  public generateEventsConfiguration(sourceFile: ts.SourceFile): boolean {
+  public async generateEventsConfiguration(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
       // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
@@ -320,7 +320,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      fs.writeFileSync(path.relative(process.cwd(), sourceFile.fileName), file)
+      await fs.promises.writeFile(path.relative(process.cwd(), sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
@@ -328,7 +328,7 @@ export class EventGenerator implements EventifyGenerator {
     }
   }
 
-  public generateEventsConfigurationTypes(sourceFile: ts.SourceFile): boolean {
+  public async generateEventsConfigurationTypes(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
 
@@ -374,7 +374,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName, '/types'), file)
+      await fs.promises.writeFile(this.configService.buildPath(sourceFile.fileName, '/types'), file)
       return true
     } catch (err) {
       console.error(err)
@@ -386,7 +386,7 @@ export class EventGenerator implements EventifyGenerator {
    * @description Generates events bundle.
    * @returns {boolean} Generation status.
    */
-  public generateEventsBundle(sourceFile: ts.SourceFile): boolean {
+  public async generateEventsBundle(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
       const file = printer.printNode(
@@ -424,7 +424,7 @@ export class EventGenerator implements EventifyGenerator {
         ]),
         sourceFile
       )
-      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName), file)
+      await fs.promises.writeFile(this.configService.buildPath(sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
@@ -432,11 +432,13 @@ export class EventGenerator implements EventifyGenerator {
     }
   }
 
-  public generateBundle(): boolean {
-    return ![
-      this.generateEventsBundle(this.sourceFiles[0]),
-      this.generateEventsConfiguration(this.sourceFiles[1]),
-      this.generateEventsConfigurationTypes(this.sourceFiles[2]),
-    ].includes(false)
+  public async generateBundle(): Promise<boolean> {
+    return !(
+      await Promise.all([
+        this.generateEventsBundle(this.sourceFiles[0]),
+        this.generateEventsConfiguration(this.sourceFiles[1]),
+        this.generateEventsConfigurationTypes(this.sourceFiles[2]),
+      ])
+    ).includes(false)
   }
 }
