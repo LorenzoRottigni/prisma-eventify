@@ -25,7 +25,7 @@ generator client {
 2. Load the event bus inside you application:
 
 ```typescript
-import { LoadEventBus } from 'prisma-eventify'
+import { loadEventBus } from 'prisma-eventify'
 
 const eventBus = await loadEventBus({
     /* Excluded models */
