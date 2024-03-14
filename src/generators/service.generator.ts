@@ -40,7 +40,7 @@ export default class ServiceGenerator {
           ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
         ])
       ),
-      ts.factory.createStringLiteral('./../src/handlers/bus.handler.ts')
+      ts.factory.createStringLiteral('./../../src/handlers/bus.handler')
     )
   }
 
@@ -54,7 +54,7 @@ export default class ServiceGenerator {
     const status: boolean[] = await Promise.all(
       this.sourceFiles.map(async (sourceFile) => {
         try {
-          const path = this.configService.buildPath(sourceFile.fileName, '/services')
+          const path = await this.configService.buildPath(sourceFile.fileName, '/services')
           const file = printer.printNode(
             ts.EmitHint.SourceFile,
             ts.factory.updateSourceFile(sourceFile, [

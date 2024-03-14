@@ -247,7 +247,7 @@ export class EventGenerator implements EventifyGenerator {
     )
   }
 
-  private get eventTypeImport(): ts.ImportDeclaration {
+  private async getEventTypeImport(): Promise<ts.ImportDeclaration> {
     return ts.factory.createImportDeclaration(
       /* modifiers */ undefined,
       ts.factory.createImportClause(
@@ -257,7 +257,7 @@ export class EventGenerator implements EventifyGenerator {
           ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('EventsConfig')),
         ])
       ),
-      ts.factory.createStringLiteral(this.configService.buildPath('eventify.config.d.ts', '/types'))
+      ts.factory.createStringLiteral(await this.configService.buildPath('eventify.config.d.ts', '/types'))
     )
   }
 
@@ -269,7 +269,7 @@ export class EventGenerator implements EventifyGenerator {
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(sourceFile, [
-          this.eventTypeImport,
+          await this.getEventTypeImport(),
           this.prismaService.prismaClientImport(true),
           ts.factory.createVariableStatement(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -374,7 +374,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      await fs.promises.writeFile(this.configService.buildPath(sourceFile.fileName, '/types'), file)
+      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName, '/types'), file)
       return true
     } catch (err) {
       console.error(err)
@@ -424,7 +424,7 @@ export class EventGenerator implements EventifyGenerator {
         ]),
         sourceFile
       )
-      await fs.promises.writeFile(this.configService.buildPath(sourceFile.fileName), file)
+      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
