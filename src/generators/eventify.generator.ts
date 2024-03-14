@@ -72,7 +72,7 @@ export class EventGenerator implements EventifyGenerator {
         undefined,
         /* type */ ts.factory.createIndexedAccessTypeNode(
           /* objectType */ ts.factory.createTypeReferenceNode('Parameters', [
-            /* typeName */ ts.factory.createTypeReferenceNode(`typeof this.prisma.${model.toLowerCase()}.${method}`),
+            /* typeName */ ts.factory.createTypeReferenceNode(`PrismaClient['${model.toLowerCase()}']['${method}']`),
           ]),
           /* indexType */ ts.factory.createLiteralTypeNode(ts.factory.createNumericLiteral('0'))
         )
@@ -87,7 +87,7 @@ export class EventGenerator implements EventifyGenerator {
         undefined,
         ts.factory.createIdentifier('prisma'),
         undefined,
-        ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword)
+        ts.factory.createTypeReferenceNode('PrismaClient')
       ),
     ]
 
@@ -99,7 +99,7 @@ export class EventGenerator implements EventifyGenerator {
           undefined,
           /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
             ts.factory.createTypeReferenceNode('ReturnType', [
-              /* typeName */ ts.factory.createTypeReferenceNode(`typeof this.prisma.${model.toLowerCase()}.${method}`),
+              /* typeName */ ts.factory.createTypeReferenceNode(`PrismaClient['${model.toLowerCase()}']['${method}']`),
             ]),
           ])
         )
@@ -395,6 +395,7 @@ export class EventGenerator implements EventifyGenerator {
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(sourceFile, [
           this.createEventDefinitionImport,
+          this.prismaService.prismaClientImport(true),
           ...this.prismaService.models
             .map(({ fields, name: model }) =>
               this.configService.modelAllowed(model)
