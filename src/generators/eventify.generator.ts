@@ -320,7 +320,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      await fs.promises.writeFile(path.relative(process.cwd(), sourceFile.fileName), file)
+      await fs.promises.writeFile(path.relative(process.cwd(), sourceFile.fileName), file, { flag: 'w' })
       return true
     } catch (err) {
       console.error(err)
@@ -374,7 +374,9 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName, '/types'), file)
+      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName, '/types'), file, {
+        flag: 'w',
+      })
       return true
     } catch (err) {
       console.error(err)
@@ -424,7 +426,7 @@ export class EventGenerator implements EventifyGenerator {
         ]),
         sourceFile
       )
-      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName), file)
+      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName), file, { flag: 'w' })
       return true
     } catch (err) {
       console.error(err)
