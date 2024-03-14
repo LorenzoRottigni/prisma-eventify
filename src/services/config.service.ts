@@ -1,10 +1,16 @@
 import { EventifyConfig } from '../types/config'
-
+import fs from 'fs'
 export class ConfigService {
   constructor(protected config: EventifyConfig) {}
 
-  public buildPath(filename: string) {
-    return `${this.config.outDir}/${filename}`
+  public buildPath(filename: string, baseDir = '') {
+    if (!fs.existsSync(this.config.outDir)) {
+      fs.mkdirSync(this.config.outDir)
+    }
+    if (!fs.existsSync(`${this.config.outDir}${baseDir}`)) {
+      fs.mkdirSync(`${this.config.outDir}${baseDir}`)
+    }
+    return `${this.config.outDir}${baseDir}/${filename}`
   }
 
   public modelAllowed(model: string): boolean {

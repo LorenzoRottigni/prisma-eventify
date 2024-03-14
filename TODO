@@ -1,0 +1,2 @@
+- Generate also an codegen/index.ts that exports dynamic files inside codegen dir
+- 

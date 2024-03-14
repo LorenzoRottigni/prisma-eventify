@@ -1,10 +1,18 @@
 import { PrismaService } from '../services/prisma.service'
 import { ConfigService } from '../services/config.service'
-import { EventConstituents, EventIdentifiers, EventifyGenerator, GeneratorHook, PrismaAPI } from '../types'
+import {
+  EventConstituents,
+  EventIdentifiers,
+  EventifyFile,
+  EventifyGenerator,
+  GeneratorHook,
+  PrismaAPI,
+} from '../types'
 import ts from 'typescript'
 import fs from 'fs'
+import path from 'path'
 import { capitalize, createSourceFile } from '../utils'
-import { EventService } from '../services/event.service'
+import { EventService } from '../services/eventify.service'
 
 export class EventGenerator implements EventifyGenerator {
   constructor(
@@ -12,9 +20,9 @@ export class EventGenerator implements EventifyGenerator {
     private configService: ConfigService,
     private eventService = new EventService(),
     private sourceFiles: ts.SourceFile[] = [
-      createSourceFile('events.ts'),
-      createSourceFile('config.events.ts'),
-      createSourceFile('config.events.d.ts'),
+      createSourceFile(EventifyFile.events),
+      createSourceFile(EventifyFile.config),
+      createSourceFile(EventifyFile.configTypes),
     ]
   ) {}
 
@@ -249,7 +257,7 @@ export class EventGenerator implements EventifyGenerator {
           ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('EventsConfig')),
         ])
       ),
-      ts.factory.createStringLiteral(this.configService.buildPath('config.events.d.ts'))
+      ts.factory.createStringLiteral(this.configService.buildPath('eventify.config.d.ts', '/types'))
     )
   }
 
@@ -312,7 +320,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      fs.writeFileSync(sourceFile.fileName, file)
+      fs.writeFileSync(path.relative(process.cwd(), sourceFile.fileName), file)
       return true
     } catch (err) {
       console.error(err)
@@ -366,7 +374,7 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName), file)
+      fs.writeFileSync(this.configService.buildPath(sourceFile.fileName, '/types'), file)
       return true
     } catch (err) {
       console.error(err)

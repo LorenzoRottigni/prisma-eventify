@@ -7,6 +7,12 @@ export declare interface EventifyGenerator {
   generateBundle(): boolean
 }
 
+export enum EventifyFile {
+  config = 'eventify.config.ts',
+  configTypes = 'eventify.config.d.ts',
+  events = 'events.ts',
+}
+
 export enum PrismaAPI {
   findMany = 'findMany',
   findUnique = 'findUnique',

@@ -3,7 +3,7 @@ import { generatorHandler, GeneratorOptions } from '@prisma/generator-helper'
 import { PrismaService } from './services/prisma.service'
 import { ConfigService } from './services/config.service'
 import ServiceGenerator from './generators/service.generator'
-import { EventGenerator } from './generators/event.generator'
+import { EventGenerator } from './generators/eventify.generator'
 import { BusHandler } from './handlers/bus.handler'
 import { EventifyConfig } from './types/config'
 import { EventifyGenerator } from './types'
@@ -46,13 +46,13 @@ export async function getBusHandler(datamodel: string, config: EventifyConfig) {
 generatorHandler({
   onManifest() {
     return {
-      defaultOutput: './codegen',
+      defaultOutput: './dist/bundle',
       prettyName: 'Prisma Eventify',
     }
   },
   async onGenerate({ datamodel, generator }: GeneratorOptions) {
     const config: EventifyConfig = {
-      outDir: typeof generator.config?.outDir === 'string' ? typeof generator.config?.outDir : './codegen',
+      outDir: typeof generator.config?.outDir === 'string' ? typeof generator.config?.outDir : './dist/bundle',
       excludeFields: Array.isArray(generator.config?.excludeFields)
         ? generator.config.excludeFields
         : typeof generator.config?.excludeFields === 'string'

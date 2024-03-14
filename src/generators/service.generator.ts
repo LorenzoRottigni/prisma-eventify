@@ -3,7 +3,7 @@ import ts from 'typescript'
 import fs from 'fs'
 import { capitalize, createSourceFile } from '../utils'
 import { EventifySourceFile, GeneratorHook, PrismaAPI } from '../types'
-import { EventService } from '../services/event.service'
+import { EventService } from '../services/eventify.service'
 import { ConfigService } from '../services/config.service'
 
 export default class ServiceGenerator {
@@ -53,7 +53,7 @@ export default class ServiceGenerator {
     let status: boolean[] = []
     this.sourceFiles.forEach((sourceFile) => {
       try {
-        const filename = this.configService.buildPath(sourceFile.fileName)
+        const path = this.configService.buildPath(sourceFile.fileName, '/services')
         const file = printer.printNode(
           ts.EmitHint.SourceFile,
           ts.factory.updateSourceFile(sourceFile, [
@@ -64,8 +64,8 @@ export default class ServiceGenerator {
           ]),
           sourceFile
         )
-        fs.writeFileSync(filename, file)
-        status.push(fs.existsSync(filename))
+        fs.writeFileSync(path, file)
+        status.push(fs.existsSync(path))
       } catch (err) {
         console.error(err)
         status.push(false)

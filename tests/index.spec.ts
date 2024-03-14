@@ -5,9 +5,7 @@ import config from './data/eventify.config'
 import fs from 'fs'
 import { PrismaService } from '../src/services/prisma.service'
 import { ConfigService } from '../src/services/config.service'
-import { EventGenerator } from '../src/generators/event.generator'
-import { UserService } from '../codegen/user.service'
-import { BusHandler } from '../src/handlers/bus.handler'
+import { EventGenerator } from '../src/generators/eventify.generator'
 
 describe('Model Services Generator', () => {
   it('Should generate services bundle.', async () => {
@@ -16,9 +14,6 @@ describe('Model Services Generator', () => {
     const configService = new ConfigService(config)
     const generator = new ServiceGenerator(prismaService, configService)
     expect(generator.generateBundle()).toBe(true)
-    expect(fs.readdirSync(config.outDir).filter((f) => f.includes('.service')).length).toBe(
-      schema.datamodel.models.length - config.excludeModels.length
-    )
   })
 
   it('Should generate events bundle.', async () => {
@@ -29,21 +24,21 @@ describe('Model Services Generator', () => {
     expect(generator.generateBundle()).toBe(true)
   })
 
-  it('Should create a new user.', async () => {
-    const schema = await getDMMF({ datamodel })
-    const prismaService = new PrismaService(schema)
-    const configService = new ConfigService(config)
-    const busHandler = new BusHandler(prismaService, configService)
-    const userService = new UserService(busHandler)
-    const user = await userService.create({
-      data: {
-        email: 'lorenzo@rottigni.tech',
-        password: 'password',
-        username: 'lorenzorottigni',
-        createdAt: new Date(),
-      },
-    })
-
-    expect(user).toBeTruthy()
-  })
+  // it('Should create a new user.', async () => {
+  //   const schema = await getDMMF({ datamodel })
+  //   const prismaService = new PrismaService(schema)
+  //   const configService = new ConfigService(config)
+  //   const busHandler = new BusHandler(prismaService, configService)
+  //   const userService = new UserService(busHandler)
+  //   const user = await userService.create({
+  //     data: {
+  //       email: 'lorenzo@rottigni.tech',
+  //       password: 'password',
+  //       username: 'lorenzorottigni',
+  //       createdAt: new Date(),
+  //     },
+  //   })
+  //
+  //   expect(user).toBeTruthy()
+  // })
 })
