@@ -4,7 +4,7 @@
   "author": "LorenzoRottigni <lorenzo@rottigni.net>",
   "repository": "git@github.com:LorenzoRottigni/prisma-eventify.git",
   "homepage": "https://github.com/LorenzoRottigni/prisma-eventify",
-  "version": "0.0.2-alpha.f4fc186",
+  "version": "0.0.2-alpha.96bc1b1",
   "license": "MIT",
   "main": "dist/src/index.js",
   "types": "src/index.d.ts",
