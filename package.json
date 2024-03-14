@@ -11,7 +11,8 @@
     "prisma-eventify": "dist/src/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "keywords": [
     "eventify",
