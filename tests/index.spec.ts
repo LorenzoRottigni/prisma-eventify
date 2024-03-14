@@ -46,6 +46,6 @@ describe('Model Services Generator', () => {
       },
     })
 
-    expect(user).toBeTruthy()
+    expect(user.id).toBeTruthy()
   })
 })

@@ -1,3 +1,4 @@
+import path from 'path'
 import { EventBus } from 'ts-bus'
 import { EventService } from '../services/eventify.service'
 import { PrismaService } from './../services/prisma.service'
@@ -9,7 +10,7 @@ import { EventifyConfig } from '../types/config'
 
 export class BusHandler {
   private events = {}
-  private config: any
+  private config: Record<string, () => {}>
   constructor(
     config: EventifyConfig,
     schema = Prisma.dmmf as DMMF.Document,
@@ -21,15 +22,23 @@ export class BusHandler {
     this.subscribeConfigEvents()
   }
 
-  public async subscribeConfigEvents() {
-    // @ts-expect-error WIP
-    this.events = await import('./../../eventify/events')
-    this.config = await import('./../../eventify.config')
+  public async subscribeConfigEvents(): Promise<boolean> {
+    try {
+      this.events = await import(process.cwd() + '/eventify/events')
+      this.config = (await import(process.cwd() + '/eventify.config'))?.config
 
-    Object.entries(this.config).forEach(([event, callback]) => {
-      // @ts-expect-error WIP
-      this.bus.subscribe(this.events[event], callback)
-    })
+      if (!Object.keys(this.events).length)
+        throw new Error('An error occurred while trying to retrieve generated events.')
+      if (!Object.keys(this.config).length)
+        throw new Error('An error occurred while trying to retrieve eventify.config.ts.')
+
+      Object.entries(this.config).forEach(([event, callback]) => this.bus.subscribe(this.events[event], callback))
+
+      return true
+    } catch (err) {
+      console.error(err)
+      return false
+    }
   }
 
   public publishEvent(event: string, meta: { prisma: PrismaClient; [x: string]: any }) {

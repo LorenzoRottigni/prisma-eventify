@@ -38,7 +38,7 @@ generatorHandler({
         ? generator.config.excludeFields
         : typeof generator.config?.excludeFields === 'string'
         ? [generator.config?.excludeFields]
-        : [],
+        : ['id'],
       excludeModels: Array.isArray(generator.config?.excludeModels)
         ? generator.config.excludeModels
         : typeof generator.config?.excludeModels === 'string'
