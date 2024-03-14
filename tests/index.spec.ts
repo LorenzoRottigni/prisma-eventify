@@ -1,11 +1,13 @@
 import { getDMMF } from '@prisma/internals'
-import { ecommerceDatamodel as datamodel } from './prisma/schema.prisma'
+import { datamodel } from './prisma/schema.prisma'
 import ServiceGenerator from '../src/generators/service.generator'
 import { PrismaService } from '../src/services/prisma.service'
 import { ConfigService } from '../src/services/config.service'
 import { EventGenerator } from '../src/generators/eventify.generator'
 import { EventifyConfig } from '../src/types/config'
-import { BusHandler } from './../src/handlers/bus.handler'
+import { Prisma } from '@prisma/client'
+import { DMMF } from '@prisma/generator-helper'
+import { BusHandler } from '../src/handlers/bus.handler'
 import { UserService } from './../dist/bundle/services/user.service'
 
 const config: EventifyConfig = {
@@ -16,7 +18,8 @@ const config: EventifyConfig = {
 
 describe('Model Services Generator', () => {
   it('Should generate services bundle.', async () => {
-    const schema = await getDMMF({ datamodel })
+    // const schema = await getDMMF({ datamodelPath: 'tests/prisma/schema.prisma' })
+    const schema = Prisma.dmmf as DMMF.Document
     const prismaService = new PrismaService(schema)
     const configService = new ConfigService(config)
     const generator = new ServiceGenerator(prismaService, configService)
@@ -24,7 +27,7 @@ describe('Model Services Generator', () => {
   })
 
   it('Should generate events bundle.', async () => {
-    const schema = await getDMMF({ datamodel })
+    const schema = Prisma.dmmf as DMMF.Document
     const prismaService = new PrismaService(schema)
     const configService = new ConfigService(config)
     const generator = new EventGenerator(prismaService, configService)
@@ -32,14 +35,11 @@ describe('Model Services Generator', () => {
   })
 
   it('Should create a new user.', async () => {
-    const schema = await getDMMF({ datamodel })
-    const prismaService = new PrismaService(schema)
-    const configService = new ConfigService(config)
-    const busHandler = new BusHandler(prismaService, configService)
+    const busHandler = new BusHandler(config)
     const userService = new UserService(busHandler)
     const user = await userService.create({
       data: {
-        email: 'lorenzo@rottigni.tech',
+        email: 'lorenzo@rottigni.zh',
         password: 'password',
         username: 'lorenzorottigni',
         createdAt: new Date(),

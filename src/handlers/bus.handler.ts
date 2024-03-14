@@ -4,15 +4,19 @@ import config from './../../eventify.config'
 import { EventService } from '../services/eventify.service'
 import { PrismaService } from './../services/prisma.service'
 import { PrismaAPI } from '../types'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { ConfigService } from '../services/config.service'
+import { DMMF } from '@prisma/generator-helper'
+import { EventifyConfig } from '../types/config'
 
 export class BusHandler {
   constructor(
-    private prismaService: PrismaService,
-    private configService: ConfigService,
-    public bus = new EventBus(),
-    private eventService = new EventService()
+    config: EventifyConfig,
+    schema = Prisma.dmmf as DMMF.Document,
+    private prismaService = new PrismaService(schema),
+    private configService = new ConfigService(config),
+    private eventService = new EventService(),
+    public bus = new EventBus()
   ) {
     this.subscribeConfigEvents()
   }

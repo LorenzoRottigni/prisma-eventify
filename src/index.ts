@@ -8,37 +8,18 @@ import { BusHandler } from './handlers/bus.handler'
 import { EventifyConfig } from './types/config'
 import { EventifyGenerator } from './types'
 
-async function getServices(datamodel: string, config: EventifyConfig): Promise<[PrismaService, ConfigService]> {
+export async function generate(datamodel: string, config: EventifyConfig): Promise<boolean> {
   const schema = await getDMMF({ datamodel })
-  return [new PrismaService(schema), new ConfigService(config)]
-}
-
-export async function main<Standalone extends boolean>(
-  datamodel: string,
-  config: EventifyConfig,
-  standalone: Standalone = false as Standalone
-): Promise<Standalone extends true ? null : BusHandler> {
-  const [prismaService, configService] = await getServices(datamodel, config)
+  const [prismaService, configService] = [new PrismaService(schema), new ConfigService(config)]
   const generators: EventifyGenerator[] = [
     new ServiceGenerator(prismaService, configService),
     new EventGenerator(prismaService, configService),
   ]
-  const generationStatus = generators.map((generator) => generator.generateBundle())
-  if (generationStatus.includes(false))
-    throw new Error('Something went wrong while trying to generate eventify bundle.')
-  if (standalone) {
-    const busHandler = new BusHandler(prismaService, configService)
-    busHandler.subscribeConfigEvents()
-    return busHandler as Standalone extends true ? null : BusHandler
-  } else {
-    return null as Standalone extends true ? null : BusHandler
-  }
+  return !generators.map((generator) => generator.generateBundle()).includes(false)
 }
 
-export async function getBusHandler(datamodel: string, config: EventifyConfig) {
-  const [prismaService, configService] = await getServices(datamodel, config)
-
-  const busHandler = new BusHandler(prismaService, configService)
+export function loadEventBus(config: EventifyConfig) {
+  const busHandler = new BusHandler(config)
   busHandler.subscribeConfigEvents()
   return busHandler
 }
@@ -64,6 +45,6 @@ generatorHandler({
         ? [generator.config?.excludeModels]
         : [],
     }
-    main(datamodel, config, true)
+    generate(datamodel, config)
   },
 })

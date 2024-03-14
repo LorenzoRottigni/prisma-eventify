@@ -1,22 +1,65 @@
-# prisma-eventify
+# Prisma-Eventify
 
-This is meant to be a little framework arranged between the ORM and the HTTP server.
-It exposes a set of generated service classes (ex. user.service.ts) used by the HTTP server to communicate with the ORM.
-Each method of these classes contains a set of standard-named generated hooks/events that allows the final developer to safely interpolate validations, mutations and custom logics.
-Callback handlers for these generated events are defined by the generated config file.
+Prisma-Eventify is a crucial module designed to facilitate seamless communication between the ORM (Prisma) and the HTTP server (GraphQL | Rest) by employing event-driven development principles.
 
-Example flow:
-- An orm is choosen ex. Prisma
-- A service class is emitted for each model of prisma.schema
-- A set of standard-named (with variable model or using params inside the event bus, the eventbus event resolver will forward the event to the correct handler) hooks is applied to each method, the hook refers to an event bus event.
-- Library generates a config file containing all empty events designed for the schema (also the config types are generated), it expects a callback function as value.
-- An HTTP driver is chosen ex. NestJS, service classes containing injected events are injected inside NestJS context using dependency injection.
+It comprises a set of generated service classes (e.g., user.service.ts) that serve as intermediaries for communicating with the ORM, thereby enabling event-driven development. Each method within these service classes is equipped with standard-named generated events for various hooks (before, after). These events serve as entry points for integrating validations, mutations, and custom logics, ensuring flexibility and reliability in your application architecture.
+
+Automatically subscribed to an event bus, these generated events streamline the flow of data and actions between your ORM and HTTP server. Additionally, Prisma-Eventify generates an eventify.config.ts file in the project's root, containing example event handler callback functions for each subscribed generated event.
+
+When the HTTP server utilizes one of these generated services, a cascade of events for each hook is published to the event bus. This triggers the execution of custom subscribed callbacks defined within eventify.config.ts, empowering you to seamlessly implement and customize your application's behavior according to your specific requirements.
 
 ## Getting Started
 
-## Testing
+To get started with Prisma-Eventify, follow these steps:
 
+1. Add the generator to schema.prisma:
+
+```prisma
+generator client {
+  provider        = "prisma-eventify"
+  excludeModels   = []
+  excludeFields   = ["id"]
+}
+```
+
+2. Load the event bus inside you application:
+
+```typescript
+import { LoadEventBus } from 'prisma-eventify'
+
+const eventBus = await loadEventBus({
+    /* Excluded models */
+    excludeModels: [],
+    /* Excluded fields for all models */
+    excludeFields: ['id'],
+    /* Inject your application context */
+    context: this.ctx
+})
+```
+
+## Contributing
+
+Clone this repository:
+
+```bash
+https://github.com/LorenzoRottigni/prisma-eventify.git
+cd prisma-eventify
+code .
+```
+
+Run a Postgres DB:
+```bash
 docker run --name postgres-container -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d postgres
+```
 
-yarn prisma:generate --schema=tests/data/ecommerce.schema.prisma
+Prepare environment:
+```bash
+yarn
+yarn prisma:generate --schema=tests/prisma/schema.prisma
+yarn prisma:migrate dev --schema=tests/prisma/schema.prisma
+```
 
+Testing:
+```bash
+yarn test
+```

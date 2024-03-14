@@ -1,7 +1,11 @@
-export const ecommerceDatamodel = `
+export const datamodel = `
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+generator client {
+    provider = "prisma-client-js"
 }
 
 model User {
