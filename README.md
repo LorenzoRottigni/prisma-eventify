@@ -27,13 +27,40 @@ generator client {
 ```typescript
 import { loadEventBus } from 'prisma-eventify'
 
-const eventBus = await loadEventBus({
+const eventBus = loadEventBus({
     /* Excluded models */
     excludeModels: [],
     /* Excluded fields for all models */
     excludeFields: ['id'],
     /* Inject your application context */
     context: this.ctx
+})
+```
+
+## Context Injection
+
+As previously described, it's possible to inject your own application context into event handler callback functions. However, this context may vary depending on the background framework being used...
+
+### NuxtJS
+
+Injecting the NuxtJS context inside the event bus and the event bus itself inside NuxtJS context:
+
+```typescript
+import { loadEventBus } from 'prisma-eventify'
+
+export default defineNuxtPlugin(nuxtApp => {
+  return {
+    provide: {
+      eventBus: () => loadEventBus({
+          /* Excluded models */
+          excludeModels: [],
+          /* Excluded fields for all models */
+          excludeFields: ['id'],
+          /* Inject your application context */
+          context: nuxtApp
+      })
+    }
+  }
 })
 ```
 

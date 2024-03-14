@@ -1,5 +1,27 @@
 {
   "name": "prisma-eventify",
+  "description": "",
+  "author": "LorenzoRottigni <lorenzo@rottigni.net>",
+  "repository": "git@github.com:LorenzoRottigni/prisma-eventify.git",
+  "homepage": "https://github.com/LorenzoRottigni/prisma-eventify",
+  "version": "0.0.1-alpha",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "eventify",
+    "event-bus",
+    "prisma",
+    "prisma-generator",
+    "code-generation",
+    "edd"
+  ],
+  "bugs": {
+    "email": "lorenzo@rottigni.tech",
+    "url": "https://github.com/LorenzoRottigni/prisma-eventify/issues"
+  },
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate",
@@ -9,11 +31,6 @@
     "lint": "eslint --ext .ts \"src/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix"
   },
-  "version": "1.0.0",
-  "main": "index.js",
-  "repository": "git@github.com:LorenzoRottigni/prisma-EDD.git",
-  "author": "LorenzoRottigni <lorenzo@rottigni.net>",
-  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.10.2",
     "@prisma/generator-helper": "^5.10.2",
