@@ -8,7 +8,7 @@
   "license": "MIT",
   "main": "dist/src/index.js",
   "bin": {
-    "prisma-eventify": "dist/cli.js"
+    "prisma-eventify": "dist/src/cli.js"
   },
   "files": [
     "dist"
