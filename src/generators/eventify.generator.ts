@@ -263,7 +263,7 @@ export class EventGenerator implements EventifyGenerator {
 
   public async generateEventsConfiguration(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
-      // if (fs.existsSync(this.sourceFiles[0].fileName)) return true
+      if (fs.existsSync(path.relative(process.cwd(), sourceFile.fileName))) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
 
       const file = printer.printNode(
