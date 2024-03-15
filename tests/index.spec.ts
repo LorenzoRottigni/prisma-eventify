@@ -36,6 +36,7 @@ describe('Model Services Generator', () => {
 
   it('Should create a new user.', async () => {
     const busHandler = new BusHandler(config)
+    await busHandler.subscribeConfigEvents()
     const userService = new UserService(busHandler)
     const user = await userService.create({
       data: {

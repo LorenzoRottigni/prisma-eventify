@@ -6,6 +6,10 @@ import { EventifySourceFile, GeneratorHook, PrismaAPI } from '../types'
 import { EventService } from '../services/eventify.service'
 import { ConfigService } from '../services/config.service'
 
+/**
+ * @description ** ServiceGenerator **
+ * Generator class to generate a typescript AST-syntax bundle for models services.
+ */
 export default class ServiceGenerator {
   private sourceFiles: EventifySourceFile[] = []
   constructor(
@@ -28,22 +32,6 @@ export default class ServiceGenerator {
         model: model.name.toLowerCase(),
       })
     })
-  }
-
-  private get busHandlerImport() {
-    return ts.factory.createImportDeclaration(
-      /* modifiers */ undefined,
-      ts.factory.createImportClause(
-        /* isTypeOnly */ true,
-        /* name (default import) */ undefined,
-        ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
-        ])
-      ),
-      ts.factory.createStringLiteral(
-        process.env.NODE_ENV === 'develop' ? './../../src/handlers/bus.handler' : 'prisma-eventify'
-      )
-    )
   }
 
   /**
@@ -79,12 +67,132 @@ export default class ServiceGenerator {
   }
 
   /**
-   * @description Given a model and a prisma ORM method name generates the model service method.
+   * @description Generates service class construtor:
+   * constructor(private busHandler: BusHandler, private prisma = new PrismaClient()) {
+   *   prisma.$connect()
+   * }
+   * @returns {ts.ConstructorDeclaration}
+   */
+  private get serviceConstructor(): ts.ConstructorDeclaration {
+    return ts.factory.createConstructorDeclaration(
+      /* modifiers */ undefined,
+      /* params */ [
+        ts.factory.createParameterDeclaration(
+          /* modifiers */ [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
+          /* dotDotToken */ undefined,
+          /* name */ ts.factory.createIdentifier('busHandler'),
+          /* questionToken */ undefined,
+          /* type */ ts.factory.createTypeReferenceNode('BusHandler', [])
+        ),
+        ts.factory.createParameterDeclaration(
+          /* modifiers */ [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
+          /* dotDotToken */ undefined,
+          /* name */ ts.factory.createIdentifier('prisma'),
+          /* questionToken */ undefined,
+          /* type */ undefined,
+          /* initalizer */ ts.factory.createNewExpression(ts.factory.createIdentifier('PrismaClient'), undefined, [])
+        ),
+      ],
+      /* body */ ts.factory.createBlock(
+        [
+          /* expression */ ts.factory.createExpressionStatement(
+            /* expression */ ts.factory.createCallExpression(
+              /* expression */ ts.factory.createPropertyAccessExpression(
+                /* expression */ ts.factory.createIdentifier('prisma'),
+                /* name */ ts.factory.createIdentifier('$connect')
+              ),
+              /* typeArgs */ undefined,
+              /* Args */ []
+            )
+          ),
+        ],
+        /* multiline */ true
+      )
+    )
+  }
+
+  /**
+   * @description generates import declaration for Eventify BusHandler:
+   * - prod: import type { BusHandler } from 'prisma-eventify'
+   * - dev: import type { BusHandler } from './../../src/handlers/bus.handler'
+   * */
+  private get busHandlerImport() {
+    return ts.factory.createImportDeclaration(
+      /* modifiers */ undefined,
+      ts.factory.createImportClause(
+        /* isTypeOnly */ true,
+        /* name (default import) */ undefined,
+        ts.factory.createNamedImports([
+          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('BusHandler')),
+        ])
+      ),
+      ts.factory.createStringLiteral(
+        process.env.NODE_ENV === 'develop' ? './../../src/handlers/bus.handler' : 'prisma-eventify'
+      )
+    )
+  }
+
+  /**
+   * @description Given a model name generates its service class:
+   * import { PrismaClient } from "@prisma/client";
+   * import type { BusHandler } from "prisma-eventify";
+   * import type { <Model> } from "@prisma/client";
+   * export class <Model>Service {
+   *  constructor(private busHandler: BusHandler, private prisma = new PrismaClient()) {
+   *      prisma.$connect();
+   *  }
+   *  ...modelMethods
+   *  ...modelSetters
+   *  ...modelGetters
+   * }
+   * @param {string} modelName
+   * @returns {ts.ClassDeclaration}
+   */
+  private generateModelServiceClass(modelName: string): ts.ClassDeclaration {
+    const model = this.prismaService.getModel(modelName)
+    return ts.factory.createClassDeclaration(
+      /* modifiers */ [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+      /* name */ `${capitalize(modelName)}Service`,
+      /* typeParams */ [],
+      /* heritageClauses */ [],
+      /* members */ model
+        ? [
+            /* member */ this.serviceConstructor,
+            /* member */ ...Object.values(PrismaAPI).map((method) => this.generateModelMethod(model.name, method)),
+            /* member */ ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name)
+                  ? this.generateModelFieldGetterMethod(model.name, field)
+                  : []
+              ),
+            /* member */ ...model.fields
+              .filter((m) => this.configService.modelAllowed(m.name))
+              .map((field) =>
+                this.configService.fieldAllowed(model.name, field.name)
+                  ? this.generateModelFieldSetterMethod(model.name, field)
+                  : []
+              ),
+          ].flat(2)
+        : []
+    )
+  }
+
+  /**
+   * @description Generates a public service model method:
+   * public async <method>(
+   *   args: Parameters<typeof this.prisma.<model>.<method>[0] = {}
+   * ): Promise<ReturnType<typeof this.prisma.<model>.<method><typeof args>>> {
+   *   this.busHandler.publishEvent('<Model>Before<Method>', { args: args, prisma: this.prisma })
+   *   var result = await this.prisma.<model>.<method>(args)
+   *   this.busHandler.publishEvent('<Model>After<Method>', { args: args, prisma: this.prisma, result: result })
+   *   return result
+   * }
    * @param {string} model Service class.
-   * @param {string} methodName Service method.
+   * @param {string} method Service method.
    * @returns {ts.MethodDeclaration}
    */
-  public generateModelMethod(model: string, method: PrismaAPI): ts.MethodDeclaration {
+  private generateModelMethod(model: string, method: PrismaAPI): ts.MethodDeclaration {
     return ts.factory.createMethodDeclaration(
       /* modifiers */ [
         ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
@@ -118,65 +226,67 @@ export default class ServiceGenerator {
       ]),
       /* body */ ts.factory.createBlock(
         [
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('this.busHandler'),
-                ts.factory.createIdentifier('publishEvent')
+          /* this.busHandler.publishEvent("<Model>Before<Method>", { args: args, prisma: this.prisma }); */ ts.factory.createExpressionStatement(
+            /*expression */ ts.factory.createCallExpression(
+              /* expression */ ts.factory.createPropertyAccessExpression(
+                /* expression */ ts.factory.createIdentifier('this.busHandler'),
+                /* name */ ts.factory.createIdentifier('publishEvent')
               ),
-              undefined,
-              [
+              /* typeArgs */ undefined,
+              /* argsArray */ [
                 ts.factory.createStringLiteral(
-                  this.eventService.composeEventIdentifiers({
+                  /* text **/ this.eventService.composeEventIdentifiers({
                     model,
                     hook: GeneratorHook.before,
                     method,
                   }).camelCase
                 ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
-                  ts.factory.createPropertyAssignment(
-                    'prisma',
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('this'),
-                      ts.factory.createIdentifier('prisma')
-                    )
-                  ),
-                ]),
+                ts.factory.createObjectLiteralExpression(
+                  /* properties */ [
+                    ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
+                    ts.factory.createPropertyAssignment(
+                      'prisma',
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('this'),
+                        ts.factory.createIdentifier('prisma')
+                      )
+                    ),
+                  ]
+                ),
               ]
             )
           ),
-          ts.factory.createVariableStatement(
-            [],
-            [
+          /* var result = await this.prisma.<model>.<method>(args); */ ts.factory.createVariableStatement(
+            /* modifiers */ [],
+            /* declarations */ [
               ts.factory.createVariableDeclaration(
-                ts.factory.createIdentifier('result'),
-                undefined,
-                undefined, // Explicitly set type to undefined
-                ts.factory.createAwaitExpression(
+                /* name */ ts.factory.createIdentifier('result'),
+                /* exclamationToken */ undefined,
+                /* type */ undefined,
+                /* await */ ts.factory.createAwaitExpression(
                   ts.factory.createCallExpression(
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createPropertyAccessExpression(
-                        ts.factory.createIdentifier('this.prisma'),
-                        ts.factory.createIdentifier(model.toLowerCase())
+                    /* expression */ ts.factory.createPropertyAccessExpression(
+                      /* expression */ ts.factory.createPropertyAccessExpression(
+                        /* expression */ ts.factory.createIdentifier('this.prisma'),
+                        /* name */ ts.factory.createIdentifier(model.toLowerCase())
                       ),
-                      ts.factory.createIdentifier(method)
+                      /* name */ ts.factory.createIdentifier(method)
                     ),
-                    undefined,
-                    [ts.factory.createIdentifier('args')]
+                    /* typeArgs */ undefined,
+                    /* args */ [ts.factory.createIdentifier('args')]
                   )
                 )
               ),
             ]
           ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('this.busHandler'),
-                ts.factory.createIdentifier('publishEvent')
+          /* this.busHandler.publishEvent("<Model>After<Method>", { args: args, prisma: this.prisma, result }); */ ts.factory.createExpressionStatement(
+            /* expression*/ ts.factory.createCallExpression(
+              /* expression */ ts.factory.createPropertyAccessExpression(
+                /* expression */ ts.factory.createIdentifier('this.busHandler'),
+                /* name */ ts.factory.createIdentifier('publishEvent')
               ),
-              undefined,
-              [
+              /* typeArgs */ undefined,
+              /* args */ [
                 ts.factory.createStringLiteral(
                   this.eventService.composeEventIdentifiers({
                     model,
@@ -184,21 +294,23 @@ export default class ServiceGenerator {
                     method,
                   }).camelCase
                 ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
-                  ts.factory.createPropertyAssignment(
-                    'prisma',
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('this'),
-                      ts.factory.createIdentifier('prisma')
-                    )
-                  ),
-                  ts.factory.createPropertyAssignment('result', ts.factory.createIdentifier('result')),
-                ]),
+                ts.factory.createObjectLiteralExpression(
+                  /* properties*/ [
+                    ts.factory.createPropertyAssignment('args', ts.factory.createIdentifier('args')),
+                    ts.factory.createPropertyAssignment(
+                      'prisma',
+                      ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('this'),
+                        ts.factory.createIdentifier('prisma')
+                      )
+                    ),
+                    ts.factory.createPropertyAssignment('result', ts.factory.createIdentifier('result')),
+                  ]
+                ),
               ]
             )
           ),
-          ts.factory.createReturnStatement(ts.factory.createIdentifier('result')),
+          /* return result; */ ts.factory.createReturnStatement(ts.factory.createIdentifier('result')),
         ],
         /* multiline */ true
       )
@@ -206,97 +318,18 @@ export default class ServiceGenerator {
   }
 
   /**
-   * @description Given a model name generates its service class.
-   * @param {string} modelName
-   * @returns {ts.ClassDeclaration}
-   */
-  private generateModelServiceClass(modelName: string): ts.ClassDeclaration {
-    const model = this.prismaService.getModel(modelName)
-    return ts.factory.createClassDeclaration(
-      [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-      `${capitalize(modelName)}Service`,
-      [],
-      [],
-      model
-        ? [
-            this.serviceConstructor,
-            ...Object.values(PrismaAPI).map((method) => this.generateModelMethod(model.name, method)),
-            ...model.fields
-              .filter((m) => this.configService.modelAllowed(m.name))
-              .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name)
-                  ? this.generateFieldGetterMethod(model.name, field)
-                  : []
-              ),
-            ...model.fields
-              .filter((m) => this.configService.modelAllowed(m.name))
-              .map((field) =>
-                this.configService.fieldAllowed(model.name, field.name)
-                  ? this.generateFieldSetterMethod(model.name, field)
-                  : []
-              ),
-          ].flat(2)
-        : []
-    )
-  }
-
-  /**
-   * @description Generates service class construtor:
-   * constructor(private prisma = new PrismaClient()) {
-   *  prisma.$connect();
-   * }
-   * @returns {ts.ConstructorDeclaration}
-   */
-  private get serviceConstructor(): ts.ConstructorDeclaration {
-    return ts.factory.createConstructorDeclaration(
-      undefined,
-      [
-        ts.factory.createParameterDeclaration(
-          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
-          undefined,
-          ts.factory.createIdentifier('busHandler'),
-          undefined,
-          ts.factory.createTypeReferenceNode('BusHandler', [])
-        ),
-        ts.factory.createParameterDeclaration(
-          [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)], // Modifier: private
-          undefined,
-          ts.factory.createIdentifier('prisma'), // Parameter name
-          undefined, // Type annotation (optional)
-          undefined,
-          ts.factory.createNewExpression(
-            ts.factory.createIdentifier('PrismaClient'), // Class name for construction
-            undefined, // Type arguments (optional)
-            [] // Empty arguments array
-          )
-        ),
-      ],
-      ts.factory.createBlock(
-        [
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('prisma'),
-                ts.factory.createIdentifier('$connect')
-              ),
-              undefined,
-              []
-            )
-          ),
-        ],
-        true
-      )
-    )
-  }
-
-  /**
    * @description Generates a public class method for getting the given model's field:
-   * ex. async function getUserEmail(id: number): Promise<string | null>
+   * public async get<Field>(id: number): Promise<string | null> {
+   *     return (await this.prisma.<model>.<field>({ where: { id: id }, select: { <field>: true } }))!.<field>! ?? null;
+   * }
    * @param modelName
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  private generateFieldGetterMethod(modelName: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private generateModelFieldGetterMethod(
+    modelName: string,
+    field: { name: string; type: string }
+  ): ts.MethodDeclaration {
     return ts.factory.createMethodDeclaration(
       /* modifiers */ [
         ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
@@ -308,82 +341,95 @@ export default class ServiceGenerator {
       /* typeParams */ undefined,
       /* params */ [
         ts.factory.createParameterDeclaration(
-          undefined,
-          undefined,
-          ts.factory.createIdentifier('id'),
-          undefined,
-          ts.factory.createTypeReferenceNode('number', [])
+          /* modifiers */ undefined,
+          /* dotDotToken */ undefined,
+          /* name */ ts.factory.createIdentifier('id'),
+          /* type */ undefined,
+          /* initializer */ ts.factory.createTypeReferenceNode('number', [])
         ),
       ],
-      /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
-        ts.factory.createUnionTypeNode([
-          this.prismaService.prismaToTSType(field.type),
-          ts.factory.createTypeReferenceNode('null'),
-        ]),
-      ]),
+      /* returnType */ ts.factory.createTypeReferenceNode(
+        'Promise',
+        /* typeArgs */ [
+          ts.factory.createUnionTypeNode([
+            this.prismaService.prismaToTSType(field.type),
+            ts.factory.createTypeReferenceNode('null'),
+          ]),
+        ]
+      ),
       /* body */ ts.factory.createBlock(
         [
-          ts.factory.createReturnStatement(
-            ts.factory.createBinaryExpression(
-              ts.factory.createNonNullExpression(
-                ts.factory.createPropertyAccessExpression(
-                  ts.factory.createNonNullExpression(
-                    ts.factory.createAwaitExpression(
-                      ts.factory.createCallExpression(
-                        ts.factory.createPropertyAccessExpression(
-                          ts.factory.createPropertyAccessExpression(
-                            ts.factory.createIdentifier('this.prisma'),
-                            ts.factory.createIdentifier(modelName.toLowerCase())
+          /* statement */ ts.factory.createReturnStatement(
+            /* expression */ ts.factory.createBinaryExpression(
+              /* left */ ts.factory.createNonNullExpression(
+                /* expresison */ ts.factory.createPropertyAccessExpression(
+                  /* expression */ ts.factory.createNonNullExpression(
+                    /* await */ ts.factory.createAwaitExpression(
+                      /* expression */ ts.factory.createCallExpression(
+                        /* expression */ ts.factory.createPropertyAccessExpression(
+                          /* expression */ ts.factory.createPropertyAccessExpression(
+                            /* expression */ ts.factory.createIdentifier('this.prisma'),
+                            /* name */ ts.factory.createIdentifier(modelName.toLowerCase())
                           ),
                           ts.factory.createIdentifier(PrismaAPI.findUnique)
                         ),
-                        undefined,
-                        [
-                          ts.factory.createObjectLiteralExpression([
-                            ts.factory.createPropertyAssignment(
-                              ts.factory.createIdentifier('where'),
-                              ts.factory.createObjectLiteralExpression([
-                                ts.factory.createPropertyAssignment(
-                                  ts.factory.createIdentifier('id'),
-                                  ts.factory.createIdentifier('id')
-                                ),
-                              ])
-                            ),
-                            ts.factory.createPropertyAssignment(
-                              ts.factory.createIdentifier('select'),
-                              ts.factory.createObjectLiteralExpression([
-                                ts.factory.createPropertyAssignment(
-                                  ts.factory.createIdentifier(field.name),
-                                  ts.factory.createTrue()
-                                ),
-                              ])
-                            ),
-                          ]),
+                        /* typeArgs */ undefined,
+                        /* args */ [
+                          ts.factory.createObjectLiteralExpression(
+                            /* properties */ [
+                              ts.factory.createPropertyAssignment(
+                                /* name */ ts.factory.createIdentifier('where'),
+                                /* initalizer */ ts.factory.createObjectLiteralExpression(
+                                  /* properties */ [
+                                    ts.factory.createPropertyAssignment(
+                                      ts.factory.createIdentifier('id'),
+                                      ts.factory.createIdentifier('id')
+                                    ),
+                                  ]
+                                )
+                              ),
+                              ts.factory.createPropertyAssignment(
+                                /* name */ ts.factory.createIdentifier('select'),
+                                /* initalizer */ ts.factory.createObjectLiteralExpression([
+                                  ts.factory.createPropertyAssignment(
+                                    ts.factory.createIdentifier(field.name),
+                                    ts.factory.createTrue()
+                                  ),
+                                ])
+                              ),
+                            ]
+                          ),
                         ]
                       )
                     )
                   ),
-                  ts.factory.createIdentifier(field.name)
+                  /* name */ ts.factory.createIdentifier(field.name)
                 )
               ),
-              ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
-              ts.factory.createNull()
+              /* operator */ ts.factory.createToken(ts.SyntaxKind.QuestionQuestionToken),
+              /* right */ ts.factory.createNull()
             )
           ),
         ],
-        true
+        /* multiline */ true
       )
     )
   }
 
   /**
    * @description Generates a public class method for setting the given model's field:
-   * ex. async function setUserEmail(id: number, user: string): Promise<User>
+   * public async set<Model>(id: number, <field>: string): Promise<User> {
+   *     this.busHandler.publishEvent("<Model><Field>Before<Method>", { args: { where: { id: id }, data: { <field>: <field> } }, prisma: this.prisma });
+   *     const result = await this.prisma.<model>.update({ where: { id: id }, data: { <field>: <field> } });
+   *     this.busHandler.publishEvent("<Model><Field>After<Method>", { where: { id: id }, data: { <field>: <field> } }, prisma: this.prisma, result: result });
+   *     return result;
+   * }
    * @param model
    * @param field
    * @returns {ts.MethodDeclaration}
    */
-  private generateFieldSetterMethod(model: string, field: { name: string; type: string }): ts.MethodDeclaration {
+  private generateModelFieldSetterMethod(model: string, field: { name: string; type: string }): ts.MethodDeclaration {
+    /* public async set<Model>(id: number, <field>: string): Promise<<Model>> */
     return ts.factory.createMethodDeclaration(
       /* modifiers */ [
         ts.factory.createModifier(ts.SyntaxKind.PublicKeyword),
@@ -395,18 +441,18 @@ export default class ServiceGenerator {
       /* typeParams */ undefined,
       /* params */ [
         ts.factory.createParameterDeclaration(
-          undefined,
-          undefined,
-          ts.factory.createIdentifier('id'),
-          undefined,
-          ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+          /* modifiers */ undefined,
+          /* dotDotToken */ undefined,
+          /* name */ ts.factory.createIdentifier('id'),
+          /* questionToken */ undefined,
+          /* type */ ts.factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
         ),
         ts.factory.createParameterDeclaration(
-          undefined,
-          undefined,
-          ts.factory.createIdentifier(field.name),
-          undefined,
-          this.prismaService.prismaToTSType(field.type)
+          /* modifiers */ undefined,
+          /* dotDotToken */ undefined,
+          /* name */ ts.factory.createIdentifier(field.name),
+          /* questionToken */ undefined,
+          /* type */ this.prismaService.prismaToTSType(field.type)
         ),
       ],
       /* returnType */ ts.factory.createTypeReferenceNode('Promise', [
@@ -414,14 +460,14 @@ export default class ServiceGenerator {
       ]),
       /* body */ ts.factory.createBlock(
         [
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('this.busHandler'),
-                ts.factory.createIdentifier('publishEvent')
+          /* statement */ ts.factory.createExpressionStatement(
+            /* expression */ ts.factory.createCallExpression(
+              /* expression */ ts.factory.createPropertyAccessExpression(
+                /* expression */ ts.factory.createIdentifier('this.busHandler'),
+                /* name */ ts.factory.createIdentifier('publishEvent')
               ),
-              undefined,
-              [
+              /* typeArgs */ undefined,
+              /* args */ [
                 ts.factory.createStringLiteral(
                   this.eventService.composeEventIdentifiers({
                     model,
@@ -430,64 +476,94 @@ export default class ServiceGenerator {
                     method: PrismaAPI.update,
                   }).camelCase
                 ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment(
-                    'args',
-                    ts.factory.createObjectLiteralExpression([
-                      ts.factory.createPropertyAssignment('id', ts.factory.createIdentifier('id')),
-                      ts.factory.createPropertyAssignment(model, ts.factory.createIdentifier(field.name)),
-                    ])
-                  ),
-                  ts.factory.createPropertyAssignment(
-                    'prisma',
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('this'),
-                      ts.factory.createIdentifier('prisma')
-                    )
-                  ),
-                ]),
+                ts.factory.createObjectLiteralExpression(
+                  /* properties */ [
+                    ts.factory.createPropertyAssignment(
+                      /* name */ 'args',
+                      /* initalizer */ ts.factory.createObjectLiteralExpression(
+                        /* properties */ [
+                          ts.factory.createPropertyAssignment(
+                            /* name */ ts.factory.createIdentifier('where'),
+                            /* initializer */ ts.factory.createObjectLiteralExpression(
+                              /* properties */ [
+                                ts.factory.createPropertyAssignment(
+                                  /* name */ ts.factory.createIdentifier('id'),
+                                  /* initalizer */ ts.factory.createIdentifier('id')
+                                ),
+                              ]
+                            )
+                          ),
+                          ts.factory.createPropertyAssignment(
+                            /* name */ ts.factory.createIdentifier('data'),
+                            /* initalizer */ ts.factory.createObjectLiteralExpression(
+                              /* properties */ [
+                                ts.factory.createPropertyAssignment(
+                                  ts.factory.createIdentifier(field.name),
+                                  ts.factory.createIdentifier(field.name)
+                                ),
+                              ]
+                            )
+                          ),
+                        ]
+                      )
+                    ),
+                    ts.factory.createPropertyAssignment(
+                      /* name */ 'prisma',
+                      /* initalizer */ ts.factory.createPropertyAccessExpression(
+                        ts.factory.createIdentifier('this'),
+                        ts.factory.createIdentifier('prisma')
+                      )
+                    ),
+                  ]
+                ),
               ]
             )
           ),
-          ts.factory.createVariableStatement(
-            [],
-            ts.factory.createVariableDeclarationList(
+          /* statement */ ts.factory.createVariableStatement(
+            /* modifiers */ [],
+            /* declarations */ ts.factory.createVariableDeclarationList(
               [
                 ts.factory.createVariableDeclaration(
-                  ts.factory.createIdentifier('result'),
-                  undefined,
-                  undefined,
-                  ts.factory.createAwaitExpression(
-                    ts.factory.createCallExpression(
-                      ts.factory.createPropertyAccessExpression(
+                  /* name */ ts.factory.createIdentifier('result'),
+                  /* exclamationToken */ undefined,
+                  /* type */ undefined,
+                  /* initializer */ ts.factory.createAwaitExpression(
+                    /* expression */ ts.factory.createCallExpression(
+                      /* expression */ ts.factory.createPropertyAccessExpression(
                         ts.factory.createPropertyAccessExpression(
                           ts.factory.createIdentifier('this.prisma'),
                           ts.factory.createIdentifier(model.toLowerCase())
                         ),
                         ts.factory.createIdentifier(PrismaAPI.update)
                       ),
-                      undefined,
-                      [
-                        ts.factory.createObjectLiteralExpression([
-                          ts.factory.createPropertyAssignment(
-                            ts.factory.createIdentifier('where'),
-                            ts.factory.createObjectLiteralExpression([
-                              ts.factory.createPropertyAssignment(
-                                ts.factory.createIdentifier('id'),
-                                ts.factory.createIdentifier('id')
-                              ),
-                            ])
-                          ),
-                          ts.factory.createPropertyAssignment(
-                            ts.factory.createIdentifier('data'),
-                            ts.factory.createObjectLiteralExpression([
-                              ts.factory.createPropertyAssignment(
-                                ts.factory.createIdentifier(field.name),
-                                ts.factory.createIdentifier(field.name)
-                              ),
-                            ])
-                          ),
-                        ]),
+                      /* typeArgs */ undefined,
+                      /* args */ [
+                        ts.factory.createObjectLiteralExpression(
+                          /* properties */ [
+                            ts.factory.createPropertyAssignment(
+                              /* name */ ts.factory.createIdentifier('where'),
+                              /* initializer */ ts.factory.createObjectLiteralExpression(
+                                /* properties */ [
+                                  ts.factory.createPropertyAssignment(
+                                    /* name */ ts.factory.createIdentifier('id'),
+                                    /* initalizer */ ts.factory.createIdentifier('id')
+                                  ),
+                                ]
+                              )
+                            ),
+                            ts.factory.createPropertyAssignment(
+                              /* name */ ts.factory.createIdentifier('data'),
+                              /* initalizer */ ts.factory.createObjectLiteralExpression(
+                                /* properties */ [
+                                  ts.factory.createPropertyAssignment(
+                                    ts.factory.createIdentifier(field.name),
+                                    ts.factory.createIdentifier(field.name)
+                                  ),
+                                ]
+                              )
+                            ),
+                          ]
+                        ),
                       ]
                     )
                   )
@@ -496,43 +572,70 @@ export default class ServiceGenerator {
               ts.NodeFlags.Const
             )
           ),
-          ts.factory.createExpressionStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createPropertyAccessExpression(
-                ts.factory.createIdentifier('this.busHandler'),
-                ts.factory.createIdentifier('publishEvent')
+          /* statement */ ts.factory.createExpressionStatement(
+            /* expression */ ts.factory.createCallExpression(
+              /* expression */ ts.factory.createPropertyAccessExpression(
+                /* expression */ ts.factory.createIdentifier('this.busHandler'),
+                /* name */ ts.factory.createIdentifier('publishEvent')
               ),
-              undefined,
-              [
+              /* typeArgs */ undefined,
+              /* args */ [
                 ts.factory.createStringLiteral(
-                  this.eventService.composeEventIdentifiers({
+                  /* text */ this.eventService.composeEventIdentifiers({
                     model,
                     field: field.name,
                     hook: GeneratorHook.after,
                     method: PrismaAPI.update,
                   }).camelCase
                 ),
-                ts.factory.createObjectLiteralExpression([
-                  ts.factory.createPropertyAssignment(
-                    'args',
-                    ts.factory.createObjectLiteralExpression([
-                      ts.factory.createPropertyAssignment('id', ts.factory.createIdentifier('id')),
-                      ts.factory.createPropertyAssignment(model.toLowerCase(), ts.factory.createIdentifier(field.name)),
-                    ])
-                  ),
-                  ts.factory.createPropertyAssignment(
-                    'prisma',
-                    ts.factory.createPropertyAccessExpression(
-                      ts.factory.createIdentifier('this'),
-                      ts.factory.createIdentifier('prisma')
-                    )
-                  ),
-                  ts.factory.createPropertyAssignment('result', ts.factory.createIdentifier('result')),
-                ]),
+                ts.factory.createObjectLiteralExpression(
+                  /* properties */ [
+                    ts.factory.createPropertyAssignment(
+                      /* name */ 'args',
+                      /* initalizer */ ts.factory.createObjectLiteralExpression(
+                        /* properties */ [
+                          ts.factory.createPropertyAssignment(
+                            /* name */ ts.factory.createIdentifier('where'),
+                            /* initializer */ ts.factory.createObjectLiteralExpression(
+                              /* properties */ [
+                                ts.factory.createPropertyAssignment(
+                                  /* name */ ts.factory.createIdentifier('id'),
+                                  /* initalizer */ ts.factory.createIdentifier('id')
+                                ),
+                              ]
+                            )
+                          ),
+                          ts.factory.createPropertyAssignment(
+                            /* name */ ts.factory.createIdentifier('data'),
+                            /* initalizer */ ts.factory.createObjectLiteralExpression(
+                              /* properties */ [
+                                ts.factory.createPropertyAssignment(
+                                  ts.factory.createIdentifier(field.name),
+                                  ts.factory.createIdentifier(field.name)
+                                ),
+                              ]
+                            )
+                          ),
+                        ]
+                      )
+                    ),
+                    ts.factory.createPropertyAssignment(
+                      /* name */ 'prisma',
+                      /* initializer */ ts.factory.createPropertyAccessExpression(
+                        /* expression */ ts.factory.createIdentifier('this'),
+                        /* name */ ts.factory.createIdentifier('prisma')
+                      )
+                    ),
+                    ts.factory.createPropertyAssignment(
+                      /* name */ 'result',
+                      /* initializer */ ts.factory.createIdentifier('result')
+                    ),
+                  ]
+                ),
               ]
             )
           ),
-          ts.factory.createReturnStatement(ts.factory.createIdentifier('result')),
+          /* statement */ ts.factory.createReturnStatement(ts.factory.createIdentifier('result')),
         ],
         /* multiline */ true
       )
