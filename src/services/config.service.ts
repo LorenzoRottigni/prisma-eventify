@@ -3,7 +3,7 @@ import fs from 'fs'
 export class ConfigService {
   constructor(protected config: EventifyConfig) {}
 
-  public async buildPath(filename: string, baseDir = '') {
+  public async buildPath(filename = '', baseDir = '') {
     try {
       if (!fs.existsSync(this.config.outDir)) {
         try {

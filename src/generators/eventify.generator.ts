@@ -318,6 +318,7 @@ export class EventGenerator implements EventifyGenerator {
     try {
       if (fs.existsSync(path.relative(process.cwd(), sourceFile.fileName))) return true
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+      const _path = path.relative(process.cwd(), sourceFile.fileName)
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
@@ -373,7 +374,14 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      await fs.promises.writeFile(path.relative(process.cwd(), sourceFile.fileName), file, { flag: 'w' })
+      try {
+        fs.accessSync(process.cwd())
+      } catch (err) {
+        console.error(err)
+        throw new Error(`Service bundle generation denied for ${path}`)
+      }
+
+      await fs.promises.writeFile(_path, file, { flag: 'w' })
       return true
     } catch (err) {
       console.error(err)
@@ -393,6 +401,7 @@ export class EventGenerator implements EventifyGenerator {
   public async generateEventsConfigurationTypes(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+      const path = await this.configService.buildPath(sourceFile.fileName, '/types')
 
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
@@ -436,7 +445,14 @@ export class EventGenerator implements EventifyGenerator {
         sourceFile
       )
 
-      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName, '/types'), file, {
+      try {
+        fs.accessSync(await this.configService.buildPath(undefined, '/types'))
+      } catch (err) {
+        console.error(err)
+        throw new Error(`Service bundle generation denied for ${path}`)
+      }
+
+      await fs.promises.writeFile(path, file, {
         flag: 'w',
       })
       return true
@@ -453,6 +469,8 @@ export class EventGenerator implements EventifyGenerator {
   public async generateEventsBundle(sourceFile: ts.SourceFile): Promise<boolean> {
     try {
       const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
+      const path = await this.configService.buildPath(sourceFile.fileName)
+
       const file = printer.printNode(
         ts.EmitHint.SourceFile,
         ts.factory.updateSourceFile(sourceFile, [
@@ -489,7 +507,15 @@ export class EventGenerator implements EventifyGenerator {
         ]),
         sourceFile
       )
-      await fs.promises.writeFile(await this.configService.buildPath(sourceFile.fileName), file, { flag: 'w' })
+
+      try {
+        fs.accessSync(await this.configService.buildPath())
+      } catch (err) {
+        console.error(err)
+        throw new Error(`Service bundle generation denied for ${path}`)
+      }
+
+      await fs.promises.writeFile(path, file, { flag: 'w' })
       return true
     } catch (err) {
       console.error(err)

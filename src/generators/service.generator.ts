@@ -55,6 +55,14 @@ export default class ServiceGenerator {
             ]),
             sourceFile
           )
+
+          try {
+            fs.accessSync(await this.configService.buildPath(undefined, '/services'))
+          } catch (err) {
+            console.error(err)
+            throw new Error(`Service bundle generation denied for ${path}`)
+          }
+
           await fs.promises.writeFile(path, file, { flag: 'w' })
           return fs.existsSync(path)
         } catch (err) {
